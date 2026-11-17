@@ -1,0 +1,8 @@
+# Caddy holt das HTTPS-Zertifikat automatisch (Let's Encrypt).
+# "mappe.example.de" durch deine Domain ersetzen.
+mappe.example.de {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080 {
+		flush_interval -1
+	}
+}

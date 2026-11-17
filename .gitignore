@@ -1,0 +1,9 @@
+# Daten und Geheimnisse gehören nie ins Repository
+data/
+.env
+*.env
+!.env.example
+session.key
+node_modules/
+*.log
+.DS_Store
