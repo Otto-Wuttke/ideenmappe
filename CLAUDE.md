@@ -4,7 +4,8 @@
 Ideenmappe: Skizzen- und Ideen-App im Stil von Concepts. Der Besitzer arbeitet viel am iPad mit Apple Pencil, entwirft technisch (Maßstab, Perspektive) und spricht Deutsch. Oberfläche, Texte und Commit-Beschreibungen auf Deutsch.
 
 ## Aufbau
-- `public/index.html`: die ganze App in einer Datei (HTML, CSS, JS, keine Build-Schritte). Externe Bibliotheken nur per CDN: perfect-freehand (jsDelivr, ESM), pdf.js 3.11.174 und jsPDF 2.5.1 (cdnjs), Google Fonts (IBM Plex).
+- `public/index.html`: die ganze App in einer Datei (HTML, CSS, JS, keine Build-Schritte). IBM Plex (woff2, Latin) und perfect-freehand 1.2.2 sind eingebettet. pdf.js 3.11.174 und jsPDF 2.5.1 liegen in `public/vendor/` und werden per `loadEither()` zuerst lokal geladen, sonst vom CDN (nur für die Einzeldatei).
+- Grundsatz: Die Server-Version lädt nichts von fremden Servern; die CSP in `server.js` erlaubt nur `'self'`. Neue Bibliotheken deshalb nach `public/vendor/` legen, mit Lizenz in `LICENSES.md`.
 - `server.js`: Node ≥ 18 ohne Abhängigkeiten. Statische Auslieferung, Passwort-Login (signierter Cookie), Boards als `data/boards/<id>.json`, Dateien in `data/files/`, Live-Updates per SSE (`/api/events`).
 - Die App wählt ihren Speicher selbst:
   1. in Claude: Artifact-Fähigkeiten `db`, `assets`, `user`, `downloads`

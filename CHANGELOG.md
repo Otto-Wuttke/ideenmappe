@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.0.1 – 17. November 2026
+
+**Keine Verbindungen zu fremden Servern mehr**
+- Schrift IBM Plex in die App eingebettet statt von Google Fonts geladen
+- Strichglättung in die App eingebettet statt von jsDelivr geladen
+- PDF-Anzeige (pdf.js) und PDF-Export (jsPDF) liegen in `public/vendor/` statt bei cdnjs
+- Der Server erlaubt dem Browser nur noch Inhalte vom eigenen Server (Content Security Policy)
+- Lizenzen der mitgelieferten Teile in `public/vendor/LICENSES.md`
+
 ## 1.0.0 – 17. November 2026
 
 Erste Version im Repository.

@@ -48,13 +48,16 @@ if (!SECRET) {
 const ID_RE = /^[A-Za-z0-9_.:~@+-]{1,120}$/;
 const FILE_RE = /^[a-f0-9]{32}\.(png|jpg|gif|webp|pdf)$/;
 const TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+const STATIC_TYPES = { '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
 const MIME = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf' };
 
+// Everything comes from this server: fonts and libraries are part of the app (public/, public/vendor/).
+// The browser is told to refuse any request to other servers.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src https://fonts.gstatic.com",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob:",
   "connect-src 'self' data: blob:",
   "worker-src 'self' blob:",
@@ -169,6 +172,18 @@ async function handle(req, res) {
     return res.end(html);
   }
   if (m === 'GET' && p === '/healthz') return send(res, 200, 'ok');
+
+  // libraries and licences shipped with the app (public, no login needed)
+  if (m === 'GET' && p.startsWith('/vendor/')) {
+    const rel = path.normalize(p).replace(/^[/\\]+/, '');
+    const file = path.join(PUBLIC, rel);
+    const type = STATIC_TYPES[path.extname(file).toLowerCase()];
+    if (!type || !file.startsWith(path.join(PUBLIC, 'vendor') + path.sep)) return send(res, 404, 'Nicht gefunden');
+    let st; try { st = await fsp.stat(file); } catch (e) { return send(res, 404, 'Nicht gefunden'); }
+    if (!st.isFile()) return send(res, 404, 'Nicht gefunden');
+    res.writeHead(200, headers({ 'Content-Type': type, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=604800' }));
+    return fs.createReadStream(file).pipe(res);
+  }
 
   // login / logout
   if (p === '/api/login' && m === 'POST') {

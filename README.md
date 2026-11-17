@@ -16,7 +16,8 @@ Eine mit KI entwickelte Ideen- und Skizzen-App im Stil von Concepts, mit weitere
 
 | Pfad | Zweck |
 |---|---|
-| `public/index.html` | die App (eine Datei) |
+| `public/index.html` | die App (eine Datei, Schrift eingebettet) |
+| `public/vendor/` | PDF-Anzeige und PDF-Export samt Lizenzen |
 | `server.js` | Server (Node.js ≥ 18, keine weiteren Pakete) |
 | `update.sh` | Update auf dem Server: neueste Version holen und neu starten |
 | `docker-compose.yml`, `Dockerfile` | Betrieb mit Docker |
@@ -128,5 +129,5 @@ Das Skript holt die neueste Version, startet neu (Docker oder systemd) und zeigt
 
 ## Gut zu wissen
 
-- Die App lädt Schriften und drei kleine Bibliotheken aus dem Internet (Google Fonts, jsDelivr, cdnjs): für Strichglättung, PDF-Anzeige und PDF-Export.
+- Die App kontaktiert keine anderen Server. Schrift und Bibliotheken sind enthalten (`public/vendor/`, Lizenzen in `public/vendor/LICENSES.md`), und der Server erlaubt dem Browser nur Inhalte vom eigenen Server.
 - Bearbeiten zwei Geräte gleichzeitig dasselbe Board, gewinnt der zuletzt gespeicherte Stand.
