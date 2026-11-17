@@ -1,0 +1,13 @@
+{
+  "name": "ideenmappe",
+  "version": "1.0.0",
+  "description": "Ideenmappe – unendliche Zeichen- und Sammelfläche, selbst gehostet",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

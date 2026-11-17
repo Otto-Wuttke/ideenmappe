@@ -1,0 +1,22 @@
+[Unit]
+Description=Ideenmappe
+After=network.target
+
+[Service]
+Type=simple
+User=ideenmappe
+Group=ideenmappe
+WorkingDirectory=/opt/ideenmappe
+EnvironmentFile=/etc/ideenmappe.env
+ExecStart=/usr/bin/node /opt/ideenmappe/server.js
+Restart=on-failure
+RestartSec=3
+# Absicherung
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ideenmappe
+
+[Install]
+WantedBy=multi-user.target
