@@ -1,6 +1,6 @@
 # Änderungen
 
-## 1.0.1 – 17. November 2026
+## 1.0.1 Beta – 17. November 2026
 
 **Keine Verbindungen zu fremden Servern mehr**
 - Schrift IBM Plex in die App eingebettet statt von Google Fonts geladen
@@ -9,9 +9,9 @@
 - Der Server erlaubt dem Browser nur noch Inhalte vom eigenen Server (Content Security Policy)
 - Lizenzen der mitgelieferten Teile in `public/vendor/LICENSES.md`
 
-## 1.0.0 – 17. November 2026
+## 1.0.0 Beta – 17. November 2026
 
-Erste Version im Repository.
+Erste Version im Repository, als Beta zum Ausprobieren im Alltag.
 
 **Fläche und Inhalte**
 - Unendliche Fläche mit Zoomen und Verschieben (Finger, Trackpad, Maus), Boards in Boards

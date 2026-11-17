@@ -1,5 +1,7 @@
 # ideenmappe
 
+> **Beta:** im Alltagstest. Datenordner regelmäßig sichern (siehe *Pflege*).
+
 Eine mit KI entwickelte Ideen- und Skizzen-App im Stil von Concepts, mit weiteren Features. Sie läuft im Browser auf iPad, Mac, PC und Handy und wird auf dem eigenen Server betrieben.
 
 **Was sie kann:**
