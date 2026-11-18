@@ -102,9 +102,9 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #viewport.t-hand,#viewport.panning{cursor:grab}
 #world{position:absolute;left:0;top:0;transform-origin:0 0}
 #persp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
-#persp .pl{stroke:rgba(121,184,242,.2);stroke-width:1px;vector-effect:non-scaling-stroke;fill:none}
-#persp .pm{stroke:rgba(121,184,242,.34);stroke-width:1px;vector-effect:non-scaling-stroke;fill:none}
-#persp .ph{stroke:rgba(121,184,242,.75);stroke-width:1.5px;vector-effect:non-scaling-stroke;fill:none}
+#persp .pl{stroke:rgba(121,184,242,.2);stroke-width:calc(1px / var(--z,1));fill:none}
+#persp .pm{stroke:rgba(121,184,242,.34);stroke-width:calc(1px / var(--z,1));fill:none}
+#persp .ph{stroke:rgba(121,184,242,.75);stroke-width:calc(1.5px / var(--z,1));fill:none}
 .vpH{position:absolute;border-radius:50%;background:#79B8F2;color:#0E1A26;display:grid;place-items:center;font-family:var(--font-mono);font-weight:600;cursor:grab;box-shadow:0 0 0 2px rgba(14,26,38,.8);touch-action:none;user-select:none}
 .vpH:active{cursor:grabbing}
 #links,#ink{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
@@ -341,21 +341,21 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #wheelMini i{width:20px;height:20px;border-radius:50%;box-shadow:0 0 0 5px var(--seg),0 0 0 6px var(--rule-strong)}
 #lehre{position:absolute;pointer-events:none}
 #lehre svg{display:block}
-#lehre .lbody{fill:var(--tool-body);stroke:var(--rule-strong);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:auto}
-#lehre .ledge{fill:none;stroke:var(--ink2);stroke-width:1.2px;vector-effect:non-scaling-stroke;pointer-events:none}
-#lehre .lcross{stroke:var(--muted);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:none}
+#lehre .lbody{fill:var(--tool-body);stroke:var(--rule-strong);stroke-width:calc(1px / var(--z,1));pointer-events:auto}
+#lehre .ledge{fill:none;stroke:var(--ink2);stroke-width:calc(1.2px / var(--z,1));pointer-events:none}
+#lehre .lcross{stroke:var(--muted);stroke-width:calc(1px / var(--z,1));pointer-events:none}
 #lehre .llab{fill:var(--ink2);font-family:var(--font-mono);pointer-events:none}
-#lehre .rticks{stroke:var(--ink2);stroke-width:1px;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+#lehre .rticks{stroke:var(--ink2);stroke-width:calc(1px / var(--z,1));fill:none;pointer-events:none}
 #lehre .rlab{fill:var(--ink2);font-family:var(--font-mono);pointer-events:none}
 #lehre .rgrip circle,#lehre .rknob circle{fill:#F2B544;pointer-events:auto;cursor:grab}
-#lehre .rgrip path,#lehre .rknob path{stroke:#1A1407;stroke-width:1.6px;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+#lehre .rgrip path,#lehre .rknob path{stroke:#1A1407;stroke-width:calc(1.6px / var(--z,1));fill:none;pointer-events:none}
 #ruler{position:absolute;transform-origin:50% 50%;pointer-events:none}
 #ruler svg{display:block}
-#ruler .rbody{fill:var(--tool-body);stroke:var(--rule-strong);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:auto}
-#ruler .rticks{stroke:var(--ink2);stroke-width:1px;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+#ruler .rbody{fill:var(--tool-body);stroke:var(--rule-strong);stroke-width:calc(1px / var(--z,1));pointer-events:auto}
+#ruler .rticks{stroke:var(--ink2);stroke-width:calc(1px / var(--z,1));fill:none;pointer-events:none}
 #ruler .rlab{fill:var(--ink2);font-family:var(--font-mono);pointer-events:none}
 #ruler .rgrip circle,#ruler .rknob circle{fill:#F2B544;pointer-events:auto;cursor:grab}
-#ruler .rgrip path,#ruler .rknob path{stroke:#1A1407;stroke-width:1.6px;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+#ruler .rgrip path,#ruler .rknob path{stroke:#1A1407;stroke-width:calc(1.6px / var(--z,1));fill:none;pointer-events:none}
 #help{position:fixed;inset:0;z-index:35;display:none;place-items:center;background:var(--scrim)}
 #help.show{display:grid}
 #help .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:22px 24px;width:min(560px,calc(100vw - 32px));max-height:calc(100% - 48px);overflow:auto}
@@ -2440,7 +2440,7 @@ function renderRuler(){
   rulerEl.style.display='block';
   Object.assign(rulerEl.style,{left:(ruler.x-L/2)+'px',top:(ruler.y-W/2)+'px',width:L+'px',height:W+'px',transform:`rotate(${ruler.a}rad)`});
   const skey=scaleLabel()+'|'+gridPx();
-  if(rulerZ===view.z&&rulerEl.dataset.len===String(L)&&rulerEl.dataset.sk===skey) return;
+  if(rulerZ===view.z&&rulerEl.dataset.len===String(L)&&rulerEl.dataset.sk===skey){ placeRulerCtl(); return; }
   rulerZ=view.z; rulerEl.dataset.len=String(L); rulerEl.dataset.sk=skey;
   // ticks in the board's unit and scale; spacing adapts to zoom (1-2-5 steps), labels at least ~50 px apart
   const z=view.z, sc=scaleOf(), uPx=unitPx(sc);
@@ -2461,12 +2461,47 @@ function renderRuler(){
     <rect width="${L}" height="${W}" rx="${6/z}" class="rbody" data-ruler="body"/>
     <path d="${ticks}" class="rticks"/>
     ${labels.replace(/<text /g,'<text class="rlab" ')}
-    <text class="rlab" x="${x0+4/z}" y="${W/2}" font-size="${9/z}" dominant-baseline="central">${sc.unit}${sc.unit==='px'?'':' · 1:'+sc.ratio.toLocaleString('de-DE')}</text>
-    <g data-ruler="move" class="rgrip"><circle cx="${L/2}" cy="${W/2}" r="${15/z}"/><path d="M${L/2-7/z} ${W/2}h${14/z}M${L/2} ${W/2-7/z}v${14/z}" /></g>
-    <g data-ruler="rot" data-end="1" class="rknob"><circle cx="${L-kr*1.4}" cy="${W/2}" r="${kr}"/><path d="M${L-kr*1.4-5/z} ${W/2-4/z}a${6/z} ${6/z} 0 1 1 0 ${8/z}"/></g>
-    <g data-ruler="rot" data-end="-1" class="rknob"><circle cx="${kr*1.4}" cy="${W/2}" r="${kr}"/><path d="M${kr*1.4+5/z} ${W/2-4/z}a${6/z} ${6/z} 0 1 0 0 ${8/z}"/></g>
+    <g class="rctl">
+      <g class="ubg"><rect y="${W/2-8/z}" height="${16/z}" rx="${3/z}" fill="var(--bg)"/><rect y="${W/2-8/z}" height="${16/z}" rx="${3/z}" fill="var(--tool-body)"/></g>
+      <text class="rlab ulab" y="${W/2}" font-size="${9/z}" dominant-baseline="central">${sc.unit}${sc.unit==='px'?'':' · 1:'+sc.ratio.toLocaleString('de-DE')}</text>
+      <g data-ruler="move" class="rgrip"><circle r="${15/z}"/><path d="M${-7/z} 0h${14/z}M0 ${-7/z}v${14/z}" /></g>
+      <g data-ruler="rot" data-end="1" class="rknob kn1"><circle r="${kr}"/><path d="M${-5/z} ${-4/z}a${6/z} ${6/z} 0 1 1 0 ${8/z}"/></g>
+      <g data-ruler="rot" data-end="-1" class="rknob kn0"><circle r="${kr}"/><path d="M${5/z} ${-4/z}a${6/z} ${6/z} 0 1 0 0 ${8/z}"/></g>
+    </g>
   </svg>`;
   rulerEl.querySelectorAll('text').forEach(t=>t.setAttribute('data-ruler','body'));
+  placeRulerCtl();
+}
+// Part of the ruler that is on screen, as a range along it measured from its centre (world units).
+// Grip and rotation knobs always sit inside this part, so they stay reachable however far you zoom in.
+function rulerVisible(){
+  const r=vp.getBoundingClientRect(), z=view.z, d=rulerDir(), L=ruler.len;
+  const x0=(34-view.x)/z, x1=(r.width-34-view.x)/z, y0=(34-view.y)/z, y1=(r.height-80-view.y)/z;
+  let lo=-L/2, hi=L/2;
+  const clip=(p,q)=>{ if(Math.abs(p)<1e-9) return q>=0; const t=q/p; if(p<0){ if(t>hi) return false; if(t>lo) lo=t; }else{ if(t<lo) return false; if(t<hi) hi=t; } return true; };
+  if(!(clip(-d.ux,ruler.x-x0)&&clip(d.ux,x1-ruler.x)&&clip(-d.uy,ruler.y-y0)&&clip(d.uy,y1-ruler.y))) return [-L/2,L/2];
+  // nor under the tool wheel, the dock or the top bar
+  const cover=['#wheel','#wheelMini','#dock','#topbar'].map(q=>document.querySelector(q)).filter(e=>e&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden').map(e=>e.getBoundingClientRect()).filter(b=>b.width&&b.height);
+  const hidden=u=>{ const kx=u*d.ux, ky=u*d.uy, sx=r.left+view.x+z*(ruler.x+kx), sy=r.top+view.y+z*(ruler.y+ky);
+    return cover.some(b=>sx>b.left-22&&sx<b.right+22&&sy>b.top-22&&sy<b.bottom+22); };
+  const kin=12*1.4/z, stp=6/z;
+  for(let i=0;i<400&&lo<hi&&hidden(lo+kin);i++) lo+=stp;
+  for(let i=0;i<400&&hi>lo&&hidden(hi-kin);i++) hi-=stp;
+  const need=150/z; // room for knob, grip, knob
+  if(hi-lo<need){ const m=(lo+hi)/2; lo=Math.max(-L/2,m-need/2); hi=Math.min(L/2,lo+need); lo=Math.max(-L/2,hi-need); }
+  return [lo,hi];
+}
+function placeRulerCtl(){
+  const c=rulerEl.querySelector('.rctl'); if(!c) return;
+  const z=view.z, L=ruler.len, W=RULER_W/z, kr=12/z, [lo,hi]=rulerVisible();
+  const a=lo+L/2, b=hi+L/2, y=W/2;
+  c.querySelector('.rgrip').setAttribute('transform',`translate(${(a+b)/2} ${y})`);
+  c.querySelector('.kn1').setAttribute('transform',`translate(${b-kr*1.4} ${y})`);
+  c.querySelector('.kn0').setAttribute('transform',`translate(${a+kr*1.4} ${y})`);
+  const ux=a+kr*2.8+4/z, ul=c.querySelector('.ulab'), ub=c.querySelector('.ubg');
+  ul.setAttribute('x',ux);
+  let tw=0; try{ tw=ul.getComputedTextLength(); }catch(e){} if(!tw) tw=ul.textContent.length*5.6/z;
+  ub.querySelectorAll('rect').forEach(q=>{ q.setAttribute('x',ux-3/z); q.setAttribute('width',tw+6/z); });
 }
 // Is a stroke starting here meant for the ruler edge? Returns the edge offset (+/-) or null.
 function rulerSnapAt(w){
@@ -2481,14 +2516,18 @@ function rulerProject(w,edge){
   return {x:ruler.x+u*d.ux+edge*d.nx,y:ruler.y+u*d.uy+edge*d.ny};
 }
 function rulerAction(e,role,end,base,w){
-  if(role==='rot') return {...base,type:'rulerRot',end:+end};
+  if(role==='rot'){ const [lo,hi]=rulerVisible(), m=(lo+hi)/2, d=rulerDir();
+    return {...base,type:'rulerRot',end:+end,piv:{x:ruler.x+m*d.ux,y:ruler.y+m*d.uy},c0:{x:ruler.x,y:ruler.y},a0:ruler.a}; }
   return {...base,type:'rulerMove',r0:{x:ruler.x,y:ruler.y}};
 }
 function moveRuler(e,w){
   const a=action;
   if(a.type==='rulerMove'){ ruler.x=a.r0.x+(w.x-a.w0.x); ruler.y=a.r0.y+(w.y-a.w0.y); renderRuler(); return; }
-  let ang=Math.atan2(w.y-ruler.y,w.x-ruler.x); if(a.end<0) ang+=Math.PI;
+  const pv=a.piv||{x:ruler.x,y:ruler.y};
+  let ang=Math.atan2(w.y-pv.y,w.x-pv.x); if(a.end<0) ang+=Math.PI;
   const step=Math.PI/12, sa=Math.round(ang/step)*step; if(Math.abs(sa-ang)<0.05||e.shiftKey) ang=sa;
+  if(a.piv){ const da=ang-a.a0, cs=Math.cos(da), sn=Math.sin(da), dx=a.c0.x-pv.x, dy=a.c0.y-pv.y;
+    ruler.x=pv.x+dx*cs-dy*sn; ruler.y=pv.y+dx*sn+dy*cs; }
   ruler.a=ang; renderRuler();
   let deg=Math.round(-ang*180/Math.PI)%180; if(deg<0) deg+=180;
   showMeasure(deg+'°',e.clientX,e.clientY);

@@ -1,6 +1,6 @@
 {
   "name": "ideenmappe",
-  "version": "1.0.3-beta",
+  "version": "1.0.4-beta",
   "description": "Ideenmappe – unendliche Zeichen- und Sammelfläche, selbst gehostet",
   "main": "server.js",
   "private": true,

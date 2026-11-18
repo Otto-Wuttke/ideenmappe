@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.0.4 Beta – 18. November 2026
+
+- Lineal: Die Fasspunkte zum Verschieben und Drehen bleiben beim Hineinzoomen immer im sichtbaren Teil des Lineals und weichen Werkzeugrad, Werkzeugleiste und Kopfzeile aus. Gedreht wird um die Mitte des sichtbaren Teils.
+- Die Teilungsstriche von Lineal und Bogenlehre sowie die Linien des Perspektivrasters bleiben bei jeder Zoomstufe gleich fein. Bisher wurden sie in Safari und Chrome beim Hineinzoomen dicker.
+- Die Angabe von Einheit und Maßstab auf dem Lineal wandert mit dem linken Fasspunkt mit.
+
 ## 1.0.3 Beta – 18. November 2026
 
 - Aquarell wirkt jetzt wässrig: ausgefranste Ränder, Papierkörnung, ungleichmäßig verteiltes Pigment und ein leicht dunklerer Trocknungsrand nur außen. Zum Strichende hin reißt die Farbe wie bei einem trockenen Pinsel in Borstenspuren auf. Wo der Pinsel über sich selbst geht, entstehen keine Spuren quer durch die Fläche.
