@@ -2517,20 +2517,26 @@ function rulerProject(w,edge){
 function rulerAction(e,role,end,base,w){
   // the grip becomes the ruler's anchor (and the zero of its numbers), so it stays where it is while dragging or turning
   const d=rulerDir(); ruler.x+=rulerGripU*d.ux; ruler.y+=rulerGripU*d.uy; rulerGripU=0;
-  if(role==='rot') return {...base,type:'rulerRot',end:+end,piv:{x:ruler.x,y:ruler.y},c0:{x:ruler.x,y:ruler.y},a0:ruler.a};
+  if(role==='rot') return {...base,type:'rulerRot',end:+end,piv:{x:ruler.x,y:ruler.y},a0:ruler.a};
   return {...base,type:'rulerMove',r0:{x:ruler.x,y:ruler.y}};
 }
+// redraw at most once per screen frame while dragging or turning
+let rulerRAF=0;
+function renderRulerSoon(){ if(!rulerRAF) rulerRAF=requestAnimationFrame(()=>{ rulerRAF=0; renderRuler(); }); }
 function moveRuler(e,w){
   const a=action;
-  if(a.type==='rulerMove'){ ruler.x=a.r0.x+(w.x-a.w0.x); ruler.y=a.r0.y+(w.y-a.w0.y); renderRuler(); return; }
-  const pv=a.piv||{x:ruler.x,y:ruler.y};
-  let ang=Math.atan2(w.y-pv.y,w.x-pv.x); if(a.end<0) ang+=Math.PI;
-  const step=Math.PI/12, sa=Math.round(ang/step)*step; if(Math.abs(sa-ang)<0.05||e.shiftKey) ang=sa;
-  if(a.piv){ const da=ang-a.a0, cs=Math.cos(da), sn=Math.sin(da), dx=a.c0.x-pv.x, dy=a.c0.y-pv.y;
-    ruler.x=pv.x+dx*cs-dy*sn; ruler.y=pv.y+dx*sn+dy*cs; }
-  ruler.a=ang; renderRuler();
-  let deg=Math.round(-ang*180/Math.PI)%180; if(deg<0) deg+=180;
-  showMeasure(deg+'°',e.clientX,e.clientY);
+  if(a.type==='rulerMove'){ ruler.x=a.r0.x+(w.x-a.w0.x); ruler.y=a.r0.y+(w.y-a.w0.y); renderRulerSoon(); return; }
+  const pv=a.piv;
+  // turn by how far the pointer turned around the grip since grabbing – no jump when the knob is not hit dead centre
+  if(a.g0===undefined) a.g0=Math.atan2(a.w0.y-pv.y,a.w0.x-pv.x);
+  let da=Math.atan2(w.y-pv.y,w.x-pv.x)-a.g0; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI;
+  let ang=a.a0+da;
+  // gentle snap to 15° steps (within ±0.8°); Shift snaps always
+  const step=Math.PI/12, sa=Math.round(ang/step)*step, snapped=Math.abs(sa-ang)<0.014||e.shiftKey;
+  if(snapped) ang=sa;
+  ruler.a=ang; renderRulerSoon();
+  let deg=(-ang*180/Math.PI)%180; if(deg<0) deg+=180; if(deg>179.95) deg=0;
+  showMeasure((snapped?Math.round(deg):Math.round(deg*10)/10).toLocaleString('de-DE')+'°',e.clientX,e.clientY);
 }
 
 /* ---------- wheel / gestures ---------- */
