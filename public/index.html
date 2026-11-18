@@ -901,7 +901,8 @@ function mkInk(abs,color,size){
   let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
   abs.forEach(([x,y])=>{minx=Math.min(minx,x);miny=Math.min(miny,y);maxx=Math.max(maxx,x);maxy=Math.max(maxy,y);});
   const w=Math.max(1,maxx-minx),h=Math.max(1,maxy-miny);
-  return {id:nid('k'),type:'ink',x:minx,y:miny,w,h,ow:w,oh:h,color,size,pen:true,pts:abs.map(([x,y,p])=>[r1(x-minx),r1(y-miny),Math.round((p??.5)*100)/100])};
+  const rr=view.z>1.2?r2:r1; // finer storage when zoomed in, so curves stay smooth on screen
+  return {id:nid('k'),type:'ink',x:minx,y:miny,w,h,ow:w,oh:h,color,size,pen:true,pts:abs.map(([x,y,p])=>[rr(x-minx),rr(y-miny),Math.round((p??.5)*100)/100])};
 }
 function seedDemo(){
   const sub=nid('b');
@@ -1189,7 +1190,8 @@ function polyD(pts){
 function fhOpts(o,last){
   const br=BRUSHES[o.brush];
   const sm=(o.sm??45)/100;
-  const opts={size:o.size,thinning:br?br.thin:(o.pen?0.6:0.5),smoothing:0.5,streamline:0.15+0.75*sm,simulatePressure:!o.pen,last};
+  // guided strokes (ruler, template, shapes) already lie exactly on their path: no streamline, it would pull curves inwards
+  const opts={size:o.size,thinning:br?br.thin:(o.pen?0.6:0.5),smoothing:0.5,streamline:o.geo?0:0.15+0.75*sm,simulatePressure:!o.pen,last};
   if(br&&br.taper&&!o.geo&&!o.cut){ opts.start={taper:o.size*br.taper/10,cap:true}; opts.end={taper:o.size*br.taper/10,cap:true}; }
   return opts;
 }
@@ -2397,7 +2399,7 @@ function lehrePts(a){
   // end snaps to 15° steps when close; up to a full turn
   let th=a.th; const st=Math.PI/12, sn=Math.round(th/st)*st; if(Math.abs(sn-th)<0.03) th=sn;
   a.thEnd=th;
-  const sweep=th-a.th0, n=Math.max(1,Math.ceil(Math.abs(sweep)*Math.max(a.erx,a.ery)/3)), P=[];
+  const sweep=th-a.th0, n=Math.max(1,Math.min(6000,Math.ceil(Math.abs(sweep)*Math.max(a.erx,a.ery)*view.z/1.5))), P=[]; // a point every ~1.5 px on screen
   for(let i=0;i<=n;i++){ const t=a.th0+sweep*i/n, q=lehreWorld(Math.cos(t)*a.erx,Math.sin(t)*a.ery); P.push([q.x,q.y,.5]); }
   return P;
 }

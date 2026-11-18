@@ -5,6 +5,7 @@
 - Lineal wie in Concepts: endlos, es geht bei jeder Zoomstufe durch den ganzen Bildschirm. Die Drehpunkte haben einen festen Abstand zum Verschiebepunkt und sind so immer bedienbar. Die Teilung wird je nach Zoom feiner oder gröber; die Zahlen zählen vom Verschiebepunkt aus.
 - Drehen läuft gleichmäßiger: kein Sprung mehr beim Greifen eines Drehpunkts, sanfteres Einrasten bei 15°-Schritten (Umschalttaste rastet immer ein), die Gradanzeige zeigt Zehntelgrad.
 - Bogenlehre: bleibt beim Hinein- und Herauszoomen gleich groß auf dem Bildschirm, wie das Lineal. Das angezeigte Maß passt sich dem Zoom an.
+- Striche an Bogenlehre, Lineal und Formen liegen exakt auf ihrer Bahn: keine Nachlauf-Glättung mehr bei geführten Strichen, Bögen mit Stützpunkten alle 1,5 Bildpunkte, beim Hineinzoomen werden Strichpunkte feiner gespeichert.
 - Liegt der Verschiebepunkt außerhalb des Bildes oder unter Werkzeugrad, Werkzeugleiste oder Kopfzeile, rückt er in den freien Bereich.
 - Die Teilungsstriche von Lineal und Bogenlehre sowie die Linien des Perspektivrasters bleiben bei jeder Zoomstufe gleich fein. Bisher wurden sie in Safari und Chrome beim Hineinzoomen dicker.
 
