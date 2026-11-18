@@ -2,9 +2,9 @@
 
 ## 1.0.4 Beta – 18. November 2026
 
-- Lineal: Die Fasspunkte zum Verschieben und Drehen bleiben beim Hineinzoomen immer im sichtbaren Teil des Lineals und weichen Werkzeugrad, Werkzeugleiste und Kopfzeile aus. Gedreht wird um die Mitte des sichtbaren Teils.
+- Lineal wie in Concepts: endlos, es geht bei jeder Zoomstufe durch den ganzen Bildschirm. Die Drehpunkte haben einen festen Abstand zum Verschiebepunkt und sind so immer bedienbar. Die Teilung wird je nach Zoom feiner oder gröber; die Zahlen zählen vom Verschiebepunkt aus.
+- Liegt der Verschiebepunkt außerhalb des Bildes oder unter Werkzeugrad, Werkzeugleiste oder Kopfzeile, rückt er in den freien Bereich.
 - Die Teilungsstriche von Lineal und Bogenlehre sowie die Linien des Perspektivrasters bleiben bei jeder Zoomstufe gleich fein. Bisher wurden sie in Safari und Chrome beim Hineinzoomen dicker.
-- Die Angabe von Einheit und Maßstab auf dem Lineal wandert mit dem linken Fasspunkt mit.
 
 ## 1.0.3 Beta – 18. November 2026
 

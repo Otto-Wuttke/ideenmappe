@@ -2431,83 +2431,82 @@ function rulerDir(){ return {ux:Math.cos(ruler.a),uy:Math.sin(ruler.a),nx:-Math.
 function toggleRuler(force){
   const on=force===undefined?!ruler.on:force;
   if(on&&!ruler.on&&!ruler.len){ const c=viewCenter(); const r=vp.getBoundingClientRect(); ruler.x=c.x; ruler.y=c.y; ruler.a=0; ruler.len=Math.min(1000,r.width*0.75)/view.z; }
+  if(on&&!ruler.on){ // anchor out of sight (e.g. after panning away): bring the ruler to the middle of the view
+    const r=vp.getBoundingClientRect(), z=view.z, sx=view.x+ruler.x*z, sy=view.y+ruler.y*z;
+    if(sx<0||sy<0||sx>r.width||sy>r.height){ const c=viewCenter(); ruler.x=c.x; ruler.y=c.y; } }
   ruler.on=on; rulerZ=0; renderRuler(); renderWheel();
+}
+// The ruler is an endless line through (ruler.x, ruler.y) at angle ruler.a. Only the part on screen is drawn, so it
+// always crosses the whole screen, at any zoom. Grip and rotation knobs keep a fixed distance on screen; the
+// division gets finer or coarser with the zoom (1-2-5 steps), numbers count from the ruler's anchor point.
+const RULER_KNOB=150; // screen px from grip to each rotation knob
+let rulerGripU=0;
+function rulerClip(x0,y0,x1,y1){
+  const d=rulerDir(); let lo=-1e12, hi=1e12;
+  const clip=(p,q)=>{ if(Math.abs(p)<1e-9) return q>=0; const t=q/p; if(p<0){ if(t>hi) return false; if(t>lo) lo=t; }else{ if(t<lo) return false; if(t<hi) hi=t; } return true; };
+  if(!(clip(-d.ux,ruler.x-x0)&&clip(d.ux,x1-ruler.x)&&clip(-d.uy,ruler.y-y0)&&clip(d.uy,y1-ruler.y))) return null;
+  return [lo,hi];
+}
+function rulerSpan(){ // part of the line on screen (plus a margin), as a range along it from the anchor, world units
+  const r=vp.getBoundingClientRect(), z=view.z, m=RULER_W;
+  return rulerClip((-m-view.x)/z,(-m-view.y)/z,(r.width+m-view.x)/z,(r.height+m-view.y)/z);
+}
+// Where the grip sits: at the anchor if that is in free view, otherwise as close to it as possible,
+// always with room for both knobs and clear of the tool wheel, the dock and the top bar.
+function rulerGrip(){
+  const r=vp.getBoundingClientRect(), z=view.z, d=rulerDir();
+  const v=rulerClip((34-view.x)/z,(34-view.y)/z,(r.width-34-view.x)/z,(r.height-80-view.y)/z);
+  if(!v) return 0;
+  let [lo,hi]=v;
+  const cover=['#wheel','#wheelMini','#dock','#topbar'].map(q=>document.querySelector(q)).filter(e=>e&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden').map(e=>e.getBoundingClientRect()).filter(b=>b.width&&b.height);
+  const hidden=u=>{ const sx=r.left+view.x+z*(ruler.x+u*d.ux), sy=r.top+view.y+z*(ruler.y+u*d.uy);
+    return cover.some(b=>sx>b.left-22&&sx<b.right+22&&sy>b.top-22&&sy<b.bottom+22); };
+  const kin=14/z, stp=6/z;
+  for(let i=0;i<500&&lo<hi&&hidden(lo+kin);i++) lo+=stp;
+  for(let i=0;i<500&&hi>lo&&hidden(hi-kin);i++) hi-=stp;
+  const D=RULER_KNOB/z+kin, a=lo+D, b=hi-D;
+  return b>=a?clamp(0,a,b):(lo+hi)/2;
 }
 function renderRuler(){
   if(!ruler.on){ rulerEl.style.display='none'; return; }
   if(!rulerEl.parentNode) world.appendChild(rulerEl);
-  const W=RULER_W/view.z, L=ruler.len;
+  const sp=rulerSpan(); if(!sp){ rulerEl.style.display='none'; return; }
+  const z=view.z, W=RULER_W/z, d=rulerDir(), [lo,hi]=sp, L=hi-lo, cu=(lo+hi)/2;
+  const cx=ruler.x+cu*d.ux, cy=ruler.y+cu*d.uy;
   rulerEl.style.display='block';
-  Object.assign(rulerEl.style,{left:(ruler.x-L/2)+'px',top:(ruler.y-W/2)+'px',width:L+'px',height:W+'px',transform:`rotate(${ruler.a}rad)`});
-  const skey=scaleLabel()+'|'+gridPx();
-  if(rulerZ===view.z&&rulerEl.dataset.len===String(L)&&rulerEl.dataset.sk===skey){ placeRulerCtl(); return; }
-  rulerZ=view.z; rulerEl.dataset.len=String(L); rulerEl.dataset.sk=skey;
-  // ticks in the board's unit and scale; spacing adapts to zoom (1-2-5 steps), labels at least ~50 px apart
-  const z=view.z, sc=scaleOf(), uPx=unitPx(sc);
+  Object.assign(rulerEl.style,{left:(cx-L/2)+'px',top:(cy-W/2)+'px',width:L+'px',height:W+'px',transform:`rotate(${ruler.a}rad)`});
+  const g=rulerGripU=rulerGrip(), gx=g-lo, D=RULER_KNOB/z, kr=12/z;
+  const sc=scaleOf(), uPx=unitPx(sc);
   const nice=v=>{ const e=Math.pow(10,Math.floor(Math.log10(v))), f=v/e; return (f<=1?1:f<=2?2:f<=5?5:10)*e; };
   const minor=nice(6/(uPx*z));
   let k=5; while(minor*k*uPx*z<52) k=k===5?10:k===10?20:k===20?50:k*2;
   const stepPx=minor*uPx;
-  const n=Math.min(4000,Math.floor((L-8/z)/stepPx)), x0=Math.max(8/z,(L-n*stepPx)/2);
+  const i0=Math.ceil(lo/stepPx), i1=Math.min(Math.floor(hi/stepPx),i0+6000);
+  const busy=[gx,gx-D,gx+D]; // keep numbers clear of grip and knobs
+  const ux=gx-D+kr*1.8, unit=sc.unit+(sc.unit==='px'?'':' · 1:'+sc.ratio.toLocaleString('de-DE')), tw=unit.length*5.6/z;
   let ticks='', labels='';
-  for(let i=0;i<=n;i++){
-    const x=x0+i*stepPx, big=i%k===0, mid=!big&&k%2===0&&i%(k/2)===0;
+  for(let i=i0;i<=i1;i++){
+    const x=i*stepPx-lo, m=((i%k)+k)%k, big=m===0, mid=!big&&k%2===0&&m===k/2;
     const len=(big?16:mid?11:6)/z;
-    ticks+=`M${x} 0V${len}M${x} ${W}V${W-len}`;
-    if(big&&x>40/z&&x<L-40/z&&Math.abs(x-L/2)>22/z) labels+=`<text x="${x}" y="${W/2}" font-size="${10/z}" text-anchor="middle" dominant-baseline="central">${(Math.round(i*minor*1e6)/1e6).toLocaleString('de-DE',{maximumFractionDigits:3})}</text>`;
+    ticks+=`M${r2(x)} 0V${r2(len)}M${r2(x)} ${r2(W)}V${r2(W-len)}`;
+    if(big&&busy.every(b=>Math.abs(x-b)>24/z)&&(x<ux-22/z||x>ux+tw+22/z)) labels+=`<text class="rlab" x="${x}" y="${W/2}" font-size="${10/z}" text-anchor="middle" dominant-baseline="central">${(Math.round(Math.abs(i)*minor*1e6)/1e6).toLocaleString('de-DE',{maximumFractionDigits:3})}</text>`;
   }
-  const kr=12/z;
   rulerEl.innerHTML=`<svg width="${L}" height="${W}" viewBox="0 0 ${L} ${W}" overflow="visible" aria-hidden="true">
-    <rect width="${L}" height="${W}" rx="${6/z}" class="rbody" data-ruler="body"/>
+    <rect width="${L}" height="${W}" class="rbody" data-ruler="body"/>
     <path d="${ticks}" class="rticks"/>
-    ${labels.replace(/<text /g,'<text class="rlab" ')}
-    <g class="rctl">
-      <g class="ubg"><rect y="${W/2-8/z}" height="${16/z}" rx="${3/z}" fill="var(--bg)"/><rect y="${W/2-8/z}" height="${16/z}" rx="${3/z}" fill="var(--tool-body)"/></g>
-      <text class="rlab ulab" y="${W/2}" font-size="${9/z}" dominant-baseline="central">${sc.unit}${sc.unit==='px'?'':' · 1:'+sc.ratio.toLocaleString('de-DE')}</text>
-      <g data-ruler="move" class="rgrip"><circle r="${15/z}"/><path d="M${-7/z} 0h${14/z}M0 ${-7/z}v${14/z}" /></g>
-      <g data-ruler="rot" data-end="1" class="rknob kn1"><circle r="${kr}"/><path d="M${-5/z} ${-4/z}a${6/z} ${6/z} 0 1 1 0 ${8/z}"/></g>
-      <g data-ruler="rot" data-end="-1" class="rknob kn0"><circle r="${kr}"/><path d="M${5/z} ${-4/z}a${6/z} ${6/z} 0 1 0 0 ${8/z}"/></g>
-    </g>
+    ${labels}
+    <rect x="${ux-3/z}" y="${W/2-8/z}" width="${tw+6/z}" height="${16/z}" rx="${3/z}" fill="var(--bg)"/><rect x="${ux-3/z}" y="${W/2-8/z}" width="${tw+6/z}" height="${16/z}" rx="${3/z}" fill="var(--tool-body)"/>
+    <text class="rlab" x="${ux}" y="${W/2}" font-size="${9/z}" dominant-baseline="central">${unit}</text>
+    <g data-ruler="move" class="rgrip" transform="translate(${gx} ${W/2})"><circle r="${15/z}"/><path d="M${-7/z} 0h${14/z}M0 ${-7/z}v${14/z}" /></g>
+    <g data-ruler="rot" data-end="1" class="rknob" transform="translate(${gx+D} ${W/2})"><circle r="${kr}"/><path d="M${-5/z} ${-4/z}a${6/z} ${6/z} 0 1 1 0 ${8/z}"/></g>
+    <g data-ruler="rot" data-end="-1" class="rknob" transform="translate(${gx-D} ${W/2})"><circle r="${kr}"/><path d="M${5/z} ${-4/z}a${6/z} ${6/z} 0 1 0 0 ${8/z}"/></g>
   </svg>`;
   rulerEl.querySelectorAll('text').forEach(t=>t.setAttribute('data-ruler','body'));
-  placeRulerCtl();
-}
-// Part of the ruler that is on screen, as a range along it measured from its centre (world units).
-// Grip and rotation knobs always sit inside this part, so they stay reachable however far you zoom in.
-function rulerVisible(){
-  const r=vp.getBoundingClientRect(), z=view.z, d=rulerDir(), L=ruler.len;
-  const x0=(34-view.x)/z, x1=(r.width-34-view.x)/z, y0=(34-view.y)/z, y1=(r.height-80-view.y)/z;
-  let lo=-L/2, hi=L/2;
-  const clip=(p,q)=>{ if(Math.abs(p)<1e-9) return q>=0; const t=q/p; if(p<0){ if(t>hi) return false; if(t>lo) lo=t; }else{ if(t<lo) return false; if(t<hi) hi=t; } return true; };
-  if(!(clip(-d.ux,ruler.x-x0)&&clip(d.ux,x1-ruler.x)&&clip(-d.uy,ruler.y-y0)&&clip(d.uy,y1-ruler.y))) return [-L/2,L/2];
-  // nor under the tool wheel, the dock or the top bar
-  const cover=['#wheel','#wheelMini','#dock','#topbar'].map(q=>document.querySelector(q)).filter(e=>e&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden').map(e=>e.getBoundingClientRect()).filter(b=>b.width&&b.height);
-  const hidden=u=>{ const kx=u*d.ux, ky=u*d.uy, sx=r.left+view.x+z*(ruler.x+kx), sy=r.top+view.y+z*(ruler.y+ky);
-    return cover.some(b=>sx>b.left-22&&sx<b.right+22&&sy>b.top-22&&sy<b.bottom+22); };
-  const kin=12*1.4/z, stp=6/z;
-  for(let i=0;i<400&&lo<hi&&hidden(lo+kin);i++) lo+=stp;
-  for(let i=0;i<400&&hi>lo&&hidden(hi-kin);i++) hi-=stp;
-  const need=150/z; // room for knob, grip, knob
-  if(hi-lo<need){ const m=(lo+hi)/2; lo=Math.max(-L/2,m-need/2); hi=Math.min(L/2,lo+need); lo=Math.max(-L/2,hi-need); }
-  return [lo,hi];
-}
-function placeRulerCtl(){
-  const c=rulerEl.querySelector('.rctl'); if(!c) return;
-  const z=view.z, L=ruler.len, W=RULER_W/z, kr=12/z, [lo,hi]=rulerVisible();
-  const a=lo+L/2, b=hi+L/2, y=W/2;
-  c.querySelector('.rgrip').setAttribute('transform',`translate(${(a+b)/2} ${y})`);
-  c.querySelector('.kn1').setAttribute('transform',`translate(${b-kr*1.4} ${y})`);
-  c.querySelector('.kn0').setAttribute('transform',`translate(${a+kr*1.4} ${y})`);
-  const ux=a+kr*2.8+4/z, ul=c.querySelector('.ulab'), ub=c.querySelector('.ubg');
-  ul.setAttribute('x',ux);
-  let tw=0; try{ tw=ul.getComputedTextLength(); }catch(e){} if(!tw) tw=ul.textContent.length*5.6/z;
-  ub.querySelectorAll('rect').forEach(q=>{ q.setAttribute('x',ux-3/z); q.setAttribute('width',tw+6/z); });
 }
 // Is a stroke starting here meant for the ruler edge? Returns the edge offset (+/-) or null.
 function rulerSnapAt(w){
   if(!ruler.on) return null;
   const d=rulerDir(), dx=w.x-ruler.x, dy=w.y-ruler.y, u=dx*d.ux+dy*d.uy, v=dx*d.nx+dy*d.ny, W=RULER_W/view.z;
-  if(Math.abs(u)>ruler.len/2+10/view.z) return null;
   if(Math.abs(v)>W/2+26/view.z) return null;
   return (v<0?-1:1)*(W/2+B().size/2);
 }
@@ -2516,8 +2515,9 @@ function rulerProject(w,edge){
   return {x:ruler.x+u*d.ux+edge*d.nx,y:ruler.y+u*d.uy+edge*d.ny};
 }
 function rulerAction(e,role,end,base,w){
-  if(role==='rot'){ const [lo,hi]=rulerVisible(), m=(lo+hi)/2, d=rulerDir();
-    return {...base,type:'rulerRot',end:+end,piv:{x:ruler.x+m*d.ux,y:ruler.y+m*d.uy},c0:{x:ruler.x,y:ruler.y},a0:ruler.a}; }
+  // the grip becomes the ruler's anchor (and the zero of its numbers), so it stays where it is while dragging or turning
+  const d=rulerDir(); ruler.x+=rulerGripU*d.ux; ruler.y+=rulerGripU*d.uy; rulerGripU=0;
+  if(role==='rot') return {...base,type:'rulerRot',end:+end,piv:{x:ruler.x,y:ruler.y},c0:{x:ruler.x,y:ruler.y},a0:ruler.a};
   return {...base,type:'rulerMove',r0:{x:ruler.x,y:ruler.y}};
 }
 function moveRuler(e,w){
