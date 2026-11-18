@@ -1808,6 +1808,12 @@ function cancelAction(){
   if(action.type==='marquee'||action.type==='create') marq.style.display='none';
   action=null; render();
 }
+// palm rejection: right after the pencil, a touch on a ruler or template body is the resting hand, not a move
+let penSeen=0;
+window.addEventListener('pointerdown',e=>{ if(e.pointerType==='pen') penSeen=Date.now(); },true);
+window.addEventListener('pointerup',e=>{ if(e.pointerType==='pen') penSeen=Date.now(); },true);
+window.addEventListener('pointermove',e=>{ if(e.pointerType==='pen'&&e.buttons) penSeen=Date.now(); },true);
+const palmLikely=e=>e.pointerType==='touch'&&Date.now()-penSeen<2000;
 vp.addEventListener('pointerdown',e=>{
   if(isEditTarget(e.target)) return;
   if(editing) commitEdit();
@@ -1837,9 +1843,11 @@ vp.addEventListener('pointerdown',e=>{
   const vh=e.target.closest&&e.target.closest('[data-vp]');
   if(vh){ action={...base,type:'vpMove',i:+vh.dataset.vp}; return; }
   const rt=e.target.closest&&e.target.closest('[data-ruler]');
-  if(rt&&(rt.dataset.ruler!=='body'||e.pointerType==='touch')){ action=rulerAction(e,rt.dataset.ruler,rt.dataset.end,base,w); return; }
+  if(rt&&rt.dataset.ruler==='body'&&palmLikely(e)) return;
+  if(rt&&(rt.dataset.ruler!=='body'||e.pointerType==='touch')){ action=rulerAction(e,rt.dataset.ruler,rt.dataset.end,base,w); if(rt.dataset.ruler==='body') action.slop=true; return; }
   const lt=e.target.closest&&e.target.closest('[data-lehre]');
-  if(lt&&(lt.dataset.lehre!=='body'||e.pointerType==='touch')){ action=lehreAction(lt.dataset.lehre==='body'?'move':lt.dataset.lehre,base); return; }
+  if(lt&&lt.dataset.lehre==='body'&&palmLikely(e)) return;
+  if(lt&&(lt.dataset.lehre!=='body'||e.pointerType==='touch')){ action=lehreAction(lt.dataset.lehre==='body'?'move':lt.dataset.lehre,base); if(lt.dataset.lehre==='body') action.slop=true; return; }
   if(tool==='pen'||(e.pointerType==='pen'&&prefs.penDraws&&tool==='select')){ startDraw(base,e,w); return; }
   if(tool==='eraser'){ action={...base,type:'erase',hist:false}; eraseAt(w); return; }
   if(handle==='resize'&&sel.size===1){
@@ -2408,8 +2416,14 @@ function lehreAction(role,base){
   if(role==='move') return {...base,type:'lehreMove',l0};
   return {...base,type:'lehreEdit',role,l0};
 }
+function slopPassed(a,e,w){
+  if(a.slopOK) return true;
+  if(Math.hypot(e.clientX-a.sx,e.clientY-a.sy)<12) return false;
+  a.slopOK=true; a.w0=w; return true; // start moving from here
+}
 function moveLehre(e,w){
   const a=action, min=6/view.z, half=gridPx()/2, snapR=r=>prefs.grid==='grid'?Math.max(half,Math.round(r/half)*half):r;
+  if(a.slop&&!slopPassed(a,e,w)) return;
   if(a.type==='lehreMove'){
     lehre.x=a.l0.x+(w.x-a.w0.x); lehre.y=a.l0.y+(w.y-a.w0.y); renderLehre(); return; // moves freely, like the ruler
   }
@@ -2531,6 +2545,7 @@ let rulerRAF=0;
 function renderRulerSoon(){ if(!rulerRAF) rulerRAF=requestAnimationFrame(()=>{ rulerRAF=0; renderRuler(); }); }
 function moveRuler(e,w){
   const a=action;
+  if(a.slop&&!slopPassed(a,e,w)) return;
   if(a.type==='rulerMove'){ ruler.x=a.r0.x+(w.x-a.w0.x); ruler.y=a.r0.y+(w.y-a.w0.y); renderRulerSoon(); return; }
   const pv=a.piv;
   // turn by how far the pointer turned around the grip since grabbing – no jump when the knob is not hit dead centre
