@@ -635,7 +635,7 @@ const BRUSHES={
   marker:{name:'Marker',   size:18, op:45, sm:60,thin:0,   taper:0, color:'amber'},
   brush: {name:'Pinsel',   size:12, op:100,sm:55,thin:0.85,taper:40,color:'graphite'},
   // special techniques: each draws itself differently (see inkParts)
-  water: {name:'Aquarell',      size:22, op:70, sm:60,thin:0.5, taper:30,color:'sky',     style:'water'},
+  water: {name:'Aquarell',      size:22, op:70, sm:60,thin:0.25,taper:0, color:'sky',     style:'water'},
   nib:   {name:'Breitfeder',    size:10, op:100,sm:55,thin:0,   taper:0, color:'graphite',style:'nib'},
   chalk: {name:'Kreide',        size:14, op:95, sm:40,thin:0.2, taper:0, color:'graphite',style:'chalk'},
   spray: {name:'Spray',         size:30, op:80, sm:40,thin:0,   taper:0, color:'coral',   style:'spray'},
@@ -1208,16 +1208,46 @@ function strokeParts(it){
   const parts=[];
   if(st==='solid') parts.push(outline(P,s));
   else if(st==='water'){
-    // only filled, slightly shifted layers of pigment: a wide pale wash, a few wandering layers and a denser core.
-    // No outline strokes – they would show as lines wherever the brush crosses its own path.
+    // filled, slightly shifted layers of pigment (wash, wandering layers, core). The look of real watercolour –
+    // ragged edges, paper grain, uneven pigment, a dark drying rim only at the outside – comes from an SVG filter
+    // (waterSVG); dry bristle streaks towards the end of the stroke are cut out with a mask.
     const layer=(f,op,amp)=>{
       const ph1=R()*6, ph2=R()*6, fx=0.06+R()*0.1;
       const Q=P.map((p,i)=>[p[0]+amp*Math.sin(i*fx+ph1),p[1]+amp*Math.cos(i*fx*0.9+ph2),p[2]]);
       const o=outline(Q,s*f); o.op=op; parts.push(o);
     };
-    layer(1.22,0.13,s*0.06);
-    for(let L=0;L<3;L++) layer(0.82+R()*0.3,0.2,s*0.13);
-    layer(0.55,0.16,s*0.08);
+    layer(1.15,0.42,s*0.05);
+    for(let L=0;L<3;L++) layer(0.8+R()*0.3,0.24,s*0.11);
+    layer(0.5,0.14,s*0.07);
+    // bounding box for filter and mask
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for(const p of P){ if(p[0]<x0)x0=p[0]; if(p[0]>x1)x1=p[0]; if(p[1]<y0)y0=p[1]; if(p[1]>y1)y1=p[1]; }
+    const m=s*1.1+4;
+    // bristle streaks: lines parallel to the path, faint along the whole stroke, broken through towards its end
+    const streaks=[], n=P.length, cum=[0];
+    for(let i=1;i<n;i++) cum[i]=cum[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
+    const len=cum[n-1]||0;
+    if(n>2&&len>s*1.5){
+      // streaks only where the brush does not pass over an earlier (or later) part of the same stroke,
+      // otherwise they would cut light lines across the other pass
+      const cell=s, grid=new Map(), key=(x,y)=>Math.floor(x/cell)+','+Math.floor(y/cell);
+      P.forEach((p,i)=>{ const k=key(p[0],p[1]); let a=grid.get(k); if(!a) grid.set(k,a=[]); a.push(i); });
+      const free=P.map((p,i)=>{ const cx=Math.floor(p[0]/cell), cy=Math.floor(p[1]/cell);
+        for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ const a=grid.get((cx+dx)+','+(cy+dy)); if(!a) continue;
+          for(const j of a) if(Math.abs(cum[j]-cum[i])>s*2.2&&Math.hypot(P[j][0]-p[0],P[j][1]-p[1])<s*1.05) return false; }
+        return true; });
+      const nor=P.map((p,i)=>{ const a=P[Math.max(0,i-2)], b=P[Math.min(n-1,i+2)]; const dx=b[0]-a[0], dy=b[1]-a[1], l=Math.hypot(dx,dy)||1; return [-dy/l,dx/l]; });
+      const seg=(o,t0,t1)=>{ let d='', on=false; for(let i=0;i<n;i++){ const t=cum[i]/len; if(t<t0||t>t1||!free[i]){ on=false; continue; } d+=(on?' L':' M')+r2(P[i][0]+nor[i][0]*o)+' '+r2(P[i][1]+nor[i][1]*o); on=true; } return d.trim(); };
+      const N=Math.max(5,Math.min(16,Math.round(s/2.2)));
+      for(let k=0;k<N;k++){
+        const o=(R()-0.5)*s*0.95, w=s*(0.02+R()*0.045);
+        const t0=0.5+R()*0.42; // dry end
+        const d1=seg(o,t0,1); if(d1) streaks.push({d:d1,w,op:0.3+R()*0.4});
+        if(R()<0.5){ const d2=seg(o+(R()-0.5)*s*0.1,0.05+R()*0.2,t0); if(d2) streaks.push({d:d2,w:w*0.7,op:0.08+R()*0.14}); }
+        if(R()<0.25){ const d3=seg(o,0,0.03+R()*0.08); if(d3) streaks.push({d:d3,w,op:0.35+R()*0.4}); }
+      }
+    }
+    parts.fx={type:'water',s,seed:((it.seed??7)>>>0)%100000,box:[r2(x0-m),r2(y0-m),r2(x1-x0+2*m),r2(y1-y0+2*m)],streaks};
   }
   else if(st==='nib'){
     // broad nib held at 45°: thick or thin depending on the direction of the stroke
@@ -1276,7 +1306,45 @@ function inkParts(it){
   c={v:fhVer,parts:strokeParts(it),hit:polyD(it.pts)};
   inkCache.set(it.id,c); return c;
 }
+// watercolour: filter (ragged edge, grain, mottled pigment, dark outer rim) + mask (dry bristle streaks)
+function waterSVG(fx,inner,uid){
+  const s=fx.s, [bx,by,bw,bh]=fx.box, S=fx.seed, f=v=>Math.round(v*1000)/1000;
+  const reg=`x="${bx}" y="${by}" width="${bw}" height="${bh}"`;
+  const fid=`wf-${uid}`, mid=`wm-${uid}`, sid=`ws-${uid}`;
+  const alphaOf=(a,b)=>`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${a} 0 0 0 ${b}`;
+  let h=`<filter id="${fid}" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" ${reg} color-interpolation-filters="sRGB">`
+   +`<feTurbulence type="fractalNoise" baseFrequency="${f(2.2/s)}" numOctaves="4" seed="${S}" result="en"/>`
+   +`<feDisplacementMap in="SourceGraphic" in2="en" scale="${f(0.26*s)}" xChannelSelector="R" yChannelSelector="G" result="dp"/>`
+   +`<feGaussianBlur in="dp" stdDeviation="${f(Math.max(0.3,0.02*s))}" result="sf"/>`
+   +`<feComponentTransfer in="sf" result="sil"><feFuncA type="linear" slope="40" intercept="-0.3"/></feComponentTransfer>`
+   +`<feMorphology in="sil" operator="erode" radius="${f(Math.max(0.6,0.06*s))}" result="er"/>`
+   +`<feGaussianBlur in="er" stdDeviation="${f(Math.max(0.5,0.05*s))}" result="erb"/>`
+   +`<feComposite in="sf" in2="erb" operator="out" result="ring"/>`
+   +`<feTurbulence type="fractalNoise" baseFrequency="0.38" numOctaves="3" seed="${S+1}" result="pg0"/>`
+   +`<feColorMatrix in="pg0" type="matrix" values="${alphaOf(1.6,0.05)}" result="pg"/>`
+   +`<feTurbulence type="fractalNoise" baseFrequency="${f(1.3/s)}" numOctaves="3" seed="${S+2}" result="mo0"/>`
+   +`<feColorMatrix in="mo0" type="matrix" values="${alphaOf(1.4,0.1)}" result="mo"/>`
+   +`<feComposite in="pg" in2="mo" operator="arithmetic" k2="0.55" k3="0.6" k4="-0.05" result="gm"/>`
+   +`<feComposite in="sf" in2="gm" operator="in" result="body"/>`
+   +`<feComponentTransfer in="ring" result="rim"><feFuncA type="linear" slope="1.3"/></feComponentTransfer>`
+   +`<feMerge><feMergeNode in="body"/><feMergeNode in="rim"/></feMerge></filter>`;
+  let mask='';
+  if(fx.streaks&&fx.streaks.length){
+    h+=`<filter id="${sid}" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" ${reg}>`
+     +`<feTurbulence type="fractalNoise" baseFrequency="${f(3/s)}" numOctaves="2" seed="${S+3}" result="n"/>`
+     +`<feDisplacementMap in="SourceGraphic" in2="n" scale="${f(0.12*s)}" xChannelSelector="R" yChannelSelector="G" result="d"/>`
+     +`<feGaussianBlur in="d" stdDeviation="${f(Math.max(0.25,0.012*s))}"/></filter>`;
+    h+=`<mask id="${mid}" maskUnits="userSpaceOnUse" ${reg}><rect ${reg} fill="#fff"/><g filter="url(#${sid})" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">`
+     +fx.streaks.map(t=>`<path d="${t.d}" stroke-width="${f(t.w)}" stroke-opacity="${f(t.op)}"/>`).join('')+`</g></mask>`;
+    mask=` mask="url(#${mid})"`;
+  }
+  return `<defs>${h}</defs><g filter="url(#${fid})"${mask}>${inner}</g>`;
+}
 function partsSVG(parts,col,uid){
+  if(parts.fx&&parts.fx.type==='water') return waterSVG(parts.fx,partsSVGplain(parts,col,uid),uid);
+  return partsSVGplain(parts,col,uid);
+}
+function partsSVGplain(parts,col,uid){
   return parts.map((p,i)=>{
     let pre='', clip='';
     if(p.clip){ const cid=`cp-${uid}-${i}`; pre=`<clipPath id="${cid}"><path d="${p.clip}"/></clipPath>`; clip=` clip-path="url(#${cid})"`; }
@@ -1681,7 +1749,7 @@ async function pagesToImages(doc,x0,y0,max,host){
         g.save(); g.setTransform(k,0,0,hk,-host.x*k,-host.y*hk); g.textBaseline='middle';
         g.beginPath(); g.rect(host.x,host.y,host.w,host.h); g.clip();
         for(const it of domOrder(pinned)) await drawDom(g,it,k);
-        for(const it of pinned) if(it.type==='ink') drawInkTo(g,it);
+        for(const it of pinned) if(it.type==='ink') await drawInkTo(g,it);
         g.restore();
       }
     }
@@ -2708,9 +2776,33 @@ async function drawDom(g,it,s){
   }
   g.restore();
 }
-function drawInkTo(g,it){
+// SVG text → image (for strokes whose look comes from SVG filters)
+function svgImage(svg){
+  return new Promise((res,rej)=>{ const u=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})); const im=new Image();
+    im.onload=()=>{ URL.revokeObjectURL(u); res(im); }; im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('svg')); }; im.src=u; });
+}
+// Some browsers mark a canvas as "tainted" after drawing an SVG image; then nothing could be exported.
+// Checked once on a scratch canvas: if it happens, watercolour strokes are exported as plain shapes.
+let fxProbe=null;
+function fxCanvasOK(){
+  if(!fxProbe) fxProbe=(async()=>{ try{
+    const im=await svgImage('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><filter id="f"><feTurbulence baseFrequency="0.5"/></filter><rect width="4" height="4" filter="url(#f)"/></svg>');
+    const c=document.createElement('canvas'); c.width=c.height=4; const g=c.getContext('2d'); g.drawImage(im,0,0); g.getImageData(0,0,1,1); return true;
+  }catch(e){ return false; } })();
+  return fxProbe;
+}
+async function drawInkTo(g,it){
   const p=inkParts(it), col=inkColor(it.color), base=(it.op??100)/100;
   g.save(); g.translate(it.x,it.y); g.scale(it.w/(it.ow||1),it.h/(it.oh||1));
+  const fx=p.parts.fx;
+  if(fx&&await fxCanvasOK()){
+    try{
+      const [bx,by,bw,bh]=fx.box, m=g.getTransform(), kx=Math.hypot(m.a,m.b), ky=Math.hypot(m.c,m.d);
+      let W=bw*kx, H=bh*ky; const cap=Math.min(1,4096/Math.max(W,H)); W=Math.max(1,Math.round(W*cap)); H=Math.max(1,Math.round(H*cap));
+      const im=await svgImage(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bx} ${by} ${bw} ${bh}" width="${W}" height="${H}">${partsSVG(p.parts,col,'x')}</svg>`);
+      g.globalAlpha=base; g.drawImage(im,bx,by,bw,bh); g.restore(); return;
+    }catch(e){ /* fall back to plain shapes below */ }
+  }
   for(const pt of p.parts){
     g.save();
     if(pt.clip) g.clip(new Path2D(pt.clip));
@@ -2748,7 +2840,7 @@ async function rasterize(R,s,bg,only){
   // cards, text, shapes, images, PDFs, boards (same order as on screen)
   for(const it of domOrder(list)){ if(take(it)&&inR(it)) await drawDom(g,it,s); }
   // sketches on top, like on screen
-  for(const it of list){ if(it.type==='ink'&&take(it)&&inR(it)) drawInkTo(g,it); }
+  for(const it of list){ if(it.type==='ink'&&take(it)&&inR(it)) await drawInkTo(g,it); }
   return c;
 }
 const toBlobP=(c,type,q)=>new Promise((res,rej)=>{ try{ c.toBlob(b=>b?res(b):rej(new Error('Bild konnte nicht erzeugt werden')),type,q); }catch(e){ rej(e); } });
@@ -2974,7 +3066,7 @@ $('#whColors').addEventListener('click',e=>{
 const lib=$('#brushLib');
 let libSlot=-1;
 const BRUSH_INFO={fine:'gleichmäßig, fein',pen:'druckempfindlich',pencil:'leicht, grau',marker:'breit, durchscheinend',brush:'spitz zulaufend',
-  water:'Lasur mit Rand',nib:'Kalligrafie 45°',chalk:'körnig, rau',spray:'Sprühnebel',hatch:'Fläche 45°',cross:'Fläche ×',dash:'verdeckte Kante',dashdot:'Mittellinie'};
+  water:'wässrig, körnig',nib:'Kalligrafie 45°',chalk:'körnig, rau',spray:'Sprühnebel',hatch:'Fläche 45°',cross:'Fläche ×',dash:'verdeckte Kante',dashdot:'Mittellinie'};
 function samplePts(){ const P=[]; for(let i=0;i<=60;i++){ const t=i/60; P.push([10+t*150,24+Math.sin(t*Math.PI*2)*11,0.35+0.5*Math.sin(t*Math.PI)]); } return P; }
 function toggleLib(slot){
   if(slot===false||slot===libSlot&&lib.classList.contains('show')){ lib.classList.remove('show'); libSlot=-1; return; }

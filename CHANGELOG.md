@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.0.3 Beta – 18. November 2026
+
+- Aquarell wirkt jetzt wässrig: ausgefranste Ränder, Papierkörnung, ungleichmäßig verteiltes Pigment und ein leicht dunklerer Trocknungsrand nur außen. Zum Strichende hin reißt die Farbe wie bei einem trockenen Pinsel in Borstenspuren auf. Wo der Pinsel über sich selbst geht, entstehen keine Spuren quer durch die Fläche.
+- Aquarell-Striche haben stumpfe statt spitzer Enden.
+- Der Export zeigt Aquarell genauso wie die Fläche.
+
 ## 1.0.2 Beta – 18. November 2026
 
 - Aquarell: keine Linien mehr in der Farbfläche, wenn der Pinsel über sich selbst geht. Die Kontur fällt weg, der Strich besteht nur noch aus versetzten, transparenten Farbschichten. Bestehende Aquarell-Striche werden automatisch neu dargestellt.
