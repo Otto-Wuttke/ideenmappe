@@ -2352,6 +2352,10 @@ function renderLehre(){
   if(!lehre.on){ lehreEl.style.display='none'; return; }
   if(!lehreEl.parentNode) world.appendChild(lehreEl);
   lehreEl.style.display='block';
+  // the template keeps its size on screen at any zoom (like the ruler): its radii are in world units, so they
+  // are scaled by the zoom change since they were last set
+  if(lehre.z&&lehre.z!==view.z){ const k=lehre.z/view.z; lehre.rx*=k; lehre.ry*=k; }
+  lehre.z=view.z;
   const z=view.z, rx=lehre.rx, ry=lehre.ry, B=34/z, S=Math.max(rx,ry)+B;
   Object.assign(lehreEl.style,{left:(lehre.x-S)+'px',top:(lehre.y-S)+'px',width:S*2+'px',height:S*2+'px',transform:`rotate(${lehre.a}rad)`,transformOrigin:'50% 50%'});
   const key=[z,rx,ry,scaleLabel()].join('|'); if(key===lehreKey) return; lehreKey=key;
