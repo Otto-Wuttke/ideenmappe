@@ -1208,13 +1208,16 @@ function strokeParts(it){
   const parts=[];
   if(st==='solid') parts.push(outline(P,s));
   else if(st==='water'){
-    // several thin, shifted layers of pigment + a darker edge where the water dried
-    for(let L=0;L<4;L++){
-      const amp=s*0.12, f=0.78+R()*0.42, ph1=R()*6, ph2=R()*6, fx=0.08+R()*0.1;
+    // only filled, slightly shifted layers of pigment: a wide pale wash, a few wandering layers and a denser core.
+    // No outline strokes – they would show as lines wherever the brush crosses its own path.
+    const layer=(f,op,amp)=>{
+      const ph1=R()*6, ph2=R()*6, fx=0.06+R()*0.1;
       const Q=P.map((p,i)=>[p[0]+amp*Math.sin(i*fx+ph1),p[1]+amp*Math.cos(i*fx*0.9+ph2),p[2]]);
-      const o=outline(Q,s*f); o.op=0.24; parts.push(o);
-    }
-    const e=outline(P,s*0.92); if(e.fill){ parts.push({d:e.d,w:Math.max(0.6,s*0.045),op:0.38,cap:'round'}); }
+      const o=outline(Q,s*f); o.op=op; parts.push(o);
+    };
+    layer(1.22,0.13,s*0.06);
+    for(let L=0;L<3;L++) layer(0.82+R()*0.3,0.2,s*0.13);
+    layer(0.55,0.16,s*0.08);
   }
   else if(st==='nib'){
     // broad nib held at 45°: thick or thin depending on the direction of the stroke

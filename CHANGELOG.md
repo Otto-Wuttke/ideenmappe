@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.0.2 Beta – 18. November 2026
+
+- Aquarell: keine Linien mehr in der Farbfläche, wenn der Pinsel über sich selbst geht. Die Kontur fällt weg, der Strich besteht nur noch aus versetzten, transparenten Farbschichten. Bestehende Aquarell-Striche werden automatisch neu dargestellt.
+
 ## 1.0.1 Beta – 17. November 2026
 
 **Keine Verbindungen zu fremden Servern mehr**
