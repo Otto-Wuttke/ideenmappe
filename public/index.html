@@ -123,6 +123,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #viewport.texting{user-select:text;-webkit-user-select:text}
 #viewport.texting>*:not(#world),#viewport.texting #world>*:not(#items),#viewport.texting .item:not(.editing),#viewport.texting .item:not(.editing) *{user-select:none;-webkit-user-select:none}
 .t-text .content{padding:4px 6px}
+:root:not([data-ui="paper"]) .item.pinned{--label-bg:rgba(255,255,255,.95)}
 .t-text.pinned .content{display:inline-block;max-width:100%;vertical-align:top;background:var(--label-bg);border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .t-note{background:var(--fill);border:1px solid var(--line-c);border-radius:10px;padding:12px 14px;box-shadow:0 1px 0 rgba(0,0,0,.35),0 8px 24px -12px rgba(0,0,0,.6)}
 .t-note .content{font-size:15px}
@@ -670,7 +671,30 @@ prefs.guide=['free','line','rect','ellipse'].includes(prefs.guide)?prefs.guide:'
 prefs.recent=Array.isArray(prefs.recent)?prefs.recent:[];
 if(prefs.wheel===undefined) prefs.wheel=innerWidth>=700?'open':'closed';
 const B=()=>prefs.bset[prefs.brush];
-function inkColor(c){ if(typeof c==='string'&&c[0]==='#') return c; return (COLORS[c]||COLORS.graphite).ink; }
+// Colours are stored as they look on paper (and are printed). The dark view shows them with lightness turned
+// around (black → light, dark blue → light blue, the hue stays). Exports always look like paper, and sketches
+// pinned to a PDF page or an image keep paper colours too, because the page under them stays light.
+let EXPORTING=false;
+const darkView=it=>!EXPORTING&&prefs.theme!=='paper'&&!(it&&it.att);
+const pal=it=>darkView(it)?COLORS_DARK:COLORS_PAPER;
+const darkHexCache=new Map();
+function darkHex(hx){
+  if(!/^#[0-9a-f]{6}$/i.test(hx)) return hx;
+  let v=darkHexCache.get(hx); if(v) return v;
+  const {h,s,l}=hexHsl(hx); v=hslHex(h,s,Math.round(94-0.86*l)); darkHexCache.set(hx,v); return v;
+}
+function inkColor(c,it){ if(typeof c==='string'&&c[0]==='#') return darkView(it)?darkHex(c):c; const P=pal(it); return (P[c]||P.graphite).ink; }
+// paper look of the interface colours, for exports made from the dark view
+function paperUI(){
+  const r=document.documentElement, old=r.dataset.ui; r.dataset.ui='paper';
+  const cs=getComputedStyle(r), g=n=>cs.getPropertyValue(n).trim();
+  const o={bg:g('--bg'),panel:g('--panel'),rule:g('--rule'),text:g('--text'),muted:g('--muted'),ink2:g('--ink2'),labelBg:g('--label-bg'),gridMajor:g('--grid-major'),gridMinor:g('--grid-minor')};
+  if(old===undefined) delete r.dataset.ui; else r.dataset.ui=old; return o;
+}
+async function asPaper(fn){
+  const keep={...UI}; EXPORTING=true; Object.assign(UI,paperUI());
+  try{ return await fn(); } finally{ EXPORTING=false; Object.assign(UI,keep); }
+}
 const MM=0.25; // paper: 4 canvas px = 1 mm at scale 1:1
 /* ---------- scale & units (per board): e.g. a floor plan at 1:50 in metres, a detail at 1:1 in mm ---------- */
 const UNITS={px:'Pixel',mm:'Millimeter',cm:'Zentimeter',m:'Meter'};
@@ -1079,7 +1103,7 @@ function redoIt(){
 
 /* ---------- rendering ---------- */
 const plainOK=(()=>{const d=document.createElement('div');d.contentEditable='plaintext-only';return d.contentEditable==='plaintext-only';})();
-function colorVars(el,c){const C=COLORS[c]||COLORS.graphite;el.style.setProperty('--fill',C.fill);el.style.setProperty('--line-c',C.line);el.style.setProperty('--ink',C.ink);}
+function colorVars(el,c,it){const P=pal(it), C=P[c]||P.graphite;el.style.setProperty('--fill',C.fill);el.style.setProperty('--line-c',C.line);el.style.setProperty('--ink',C.ink);}
 const boardIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg>';
 
 function createEl(it){
@@ -1104,7 +1128,7 @@ function shapePath(kind,w,h){
 }
 function updateEl(el,it){
   el.style.left=it.x+'px'; el.style.top=it.y+'px'; el.style.width=it.w+'px';
-  colorVars(el,it.color);
+  colorVars(el,it.color,it);
   const isEd=editing&&editing.id===it.id;
   el.classList.toggle('editing',!!isEd);
   el.classList.toggle('pinned',!!it.att);
@@ -1114,7 +1138,7 @@ function updateEl(el,it){
     if(it.type==='text'){c.style.fontSize=(it.fs||18)+'px';c.style.fontWeight=(it.fs||18)>=26?'600':'400';c.style.lineHeight=(it.fs||18)>=26?'1.2':'1.45';}
   }else if(it.type==='shape'){
     el.style.height=it.h+'px';
-    const p=el.firstChild.firstChild, C=COLORS[it.color]||COLORS.graphite;
+    const p=el.firstChild.firstChild, C=pal(it)[it.color]||pal(it).graphite;
     el.firstChild.setAttribute('viewBox',`0 0 ${it.w} ${it.h}`);
     p.setAttribute('d',shapePath(it.shape||'rect',it.w,it.h));
     p.setAttribute('fill',C.fill); p.setAttribute('stroke',C.line); p.setAttribute('stroke-width','1.5');
@@ -1369,7 +1393,7 @@ function renderInk(list){
     if(it.type!=='ink'||!inkVisible(it)) continue;
     let g=inkEls.get(it.id);
     if(!g){ g=document.createElementNS(SVGNS,'g'); g.dataset.id=it.id; inkG.appendChild(g); inkEls.set(it.id,g); }
-    const p=inkParts(it), col=inkColor(it.color), key=p.v+'|'+col+'|'+it.brush;
+    const p=inkParts(it), col=inkColor(it.color,it), key=p.v+'|'+col+'|'+it.brush;
     if(g.dataset.k!==key){
       g.dataset.k=key;
       g.innerHTML=partsSVG(p.parts,col,it.id)+`<path class="hit" stroke-width="16" vector-effect="non-scaling-stroke" stroke-linecap="round" d="${p.hit}"/>`;
@@ -1423,7 +1447,7 @@ function renderLinks(list){
     if(l.type!=='link') continue;
     const a=byId.get(l.from), b=byId.get(l.to); if(!a||!b) continue;
     const d=linkPath(a,b,l.style); if(!d) continue;
-    const s=sel.has(l.id), C=COLORS[l.color]||COLORS.graphite, col=s?'#F2B544':C.line;
+    const s=sel.has(l.id), C=pal(l)[l.color]||pal(l).graphite, col=s?'#F2B544':C.line;
     h+=`<g data-id="${l.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="${s?2.25:1.75}" stroke-linejoin="round" marker-end="url(#ah-${s?'accent':(l.color||'graphite')})"/><path class="hit" d="${d}" stroke-width="16" vector-effect="non-scaling-stroke"/></g>`;
   }
   linkG.innerHTML=h;
@@ -1766,8 +1790,8 @@ async function pagesToImages(doc,x0,y0,max,host){
         const k=c.width/host.w, hk=c.height/host.h;
         g.save(); g.setTransform(k,0,0,hk,-host.x*k,-host.y*hk); g.textBaseline='middle';
         g.beginPath(); g.rect(host.x,host.y,host.w,host.h); g.clip();
-        for(const it of domOrder(pinned)) await drawDom(g,it,k);
-        for(const it of pinned) if(it.type==='ink') await drawInkTo(g,it);
+        await asPaper(async()=>{ for(const it of domOrder(pinned)) await drawDom(g,it,k);
+        for(const it of pinned) if(it.type==='ink') await drawInkTo(g,it); });
         g.restore();
       }
     }
@@ -2820,7 +2844,7 @@ async function renderPdfPage(it,px){
 }
 /* draws one card / text / shape / image / PDF / board in world coordinates; s = pixels per world unit */
 async function drawDom(g,it,s){
-  const C=COLORS[it.color]||COLORS.graphite;
+  const C=pal(it)[it.color]||pal(it).graphite;
   g.save();
   if(it.type==='text'){
     const fs=it.fs||18, big=fs>=26, lh=fs*(big?1.2:1.45);
@@ -2879,7 +2903,7 @@ function fxCanvasOK(){
   return fxProbe;
 }
 async function drawInkTo(g,it){
-  const p=inkParts(it), col=inkColor(it.color), base=(it.op??100)/100;
+  const p=inkParts(it), col=inkColor(it.color,it), base=(it.op??100)/100;
   g.save(); g.translate(it.x,it.y); g.scale(it.w/(it.ow||1),it.h/(it.oh||1));
   const fx=p.parts.fx;
   if(fx&&await fxCanvasOK()){
@@ -2917,7 +2941,7 @@ async function rasterize(R,s,bg,only){
     const a=byId.get(l.from), b=byId.get(l.to); if(!a||!b) continue;
     if(only&&!(only.has(a.id)&&only.has(b.id))) continue;
     const P=linkPts(a,b,l.style); if(!P) continue;
-    const C=COLORS[l.color]||COLORS.graphite;
+    const C=pal(l)[l.color]||pal(l).graphite;
     g.strokeStyle=C.line; g.fillStyle=C.line; g.lineWidth=1.75; g.lineJoin='round';
     g.beginPath(); g.moveTo(P[0][0],P[0][1]); P.slice(1).forEach(p=>g.lineTo(p[0],p[1])); g.stroke();
     const e=P[P.length-1], f=P[P.length-2], len=Math.hypot(e[0]-f[0],e[1]-f[1])||1, ux=(e[0]-f[0])/len, uy=(e[1]-f[1])/len;
@@ -2938,8 +2962,7 @@ async function doExport(R,only){
     try{ await document.fonts.ready; }catch(e){}
     let s=+exp.scale||2;
     s=Math.min(s,Math.sqrt(36e6/(R.w*R.h)),16000/R.w,16000/R.h);
-    const bg=(exp.fmt==='png'&&exp.bg==='none')?null:UI.bg;
-    const c=await rasterize(R,s,bg,only);
+    const c=await asPaper(()=>rasterize(R,s,(exp.fmt==='png'&&exp.bg==='none')?null:UI.bg,only));
     let blob;
     if(exp.fmt==='png') blob=await toBlobP(c,'image/png');
     else if(exp.fmt==='jpg') blob=await toBlobP(c,'image/jpeg',0.92);
@@ -3195,7 +3218,7 @@ function hexHsl(hx){
   if(mx!==mn){ const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn); h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4; h*=60; }
   return {h:Math.round(h),s:Math.round(s*100),l:Math.round(l*100)};
 }
-const curHex=()=>{ const c=inkColor(B().color); return /^#[0-9a-f]{6}$/i.test(c)?c.toLowerCase():'#e9e6df'; };
+const curHex=()=>{ const c=B().color; const h=typeof c==='string'&&c[0]==='#'?c:(COLORS_PAPER[c]||COLORS_PAPER.graphite).ink; return /^#[0-9a-f]{6}$/i.test(h)?h.toLowerCase():'#2b2d31'; return /^#[0-9a-f]{6}$/i.test(c)?c.toLowerCase():'#e9e6df'; };
 // Own palette: 12 families × 4 strips (strong → greyed) × 6–7 shades (dark → light) = 312, plus 40 greys and 6 neon = 358
 const FAMILIES=[
   {k:'Ro',name:'Rot',h:356},{k:'Ma',name:'Magenta',h:322},{k:'Vi',name:'Violett',h:283},{k:'Bv',name:'Blauviolett',h:248},
@@ -3476,7 +3499,7 @@ window.addEventListener('resize',()=>applyView());
 
 /* ---------- start ---------- */
 applyTheme(prefs.theme,true);
-$('#themeBtn').onclick=()=>{ applyTheme(prefs.theme==='paper'?'dark':'paper'); toast(prefs.theme==='paper'?'Papier: helles Blatt mit blauem Raster. Graphit zeichnet jetzt dunkel.':'Dunkel: dunkle Fläche, Graphit zeichnet hell.'); };
+$('#themeBtn').onclick=()=>{ applyTheme(prefs.theme==='paper'?'dark':'paper'); toast(prefs.theme==='paper'?'Papier: helles Blatt mit blauem Raster.':'Dunkel: Farben werden zum Arbeiten aufgehellt. Export und Druck sehen weiter aus wie auf Papier.'); };
 setTool('select'); renderPenOpts(); updateGridBtn(); updatePenDraws();
 initStorage();
 })();
