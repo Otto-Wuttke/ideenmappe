@@ -2,7 +2,7 @@
 
 ## 1.0.5 Beta – 20. November 2026
 
-- Textboxen: Der Cursor ist beim Bearbeiten sichtbar, auch in Safari und Firefox, und steht gleich am Textende.
+- Textboxen: Der Cursor ist beim Bearbeiten gut sichtbar (kräftiges Blau statt Akzentfarbe), auch in Safari und Firefox, und steht gleich am Textende.
 - Kopien herausziehen: Mit gedrückter Strg-Taste (Mac: ⌘ oder ⌥) ein Objekt oder eine Auswahl ziehen erzeugt eine Kopie, das Original bleibt liegen. An Bildern und PDF-Seiten angeheftete Skizzen und Verbindungen innerhalb der Auswahl kommen mit. Ein Klick ohne Ziehen erzeugt keine Kopie; Rückgängig entfernt die Kopie in einem Schritt.
 
 ## 1.0.4 Beta – 18. November 2026

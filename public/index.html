@@ -16,6 +16,7 @@
 <style>
 /* Layout: one full-screen canvas; slim top bar (path + status), floating tool dock at the bottom, context bar for the selection. Single dark theme by design. */
 :root{
+  --caret:#6FB8FF;
   --bg:#121316;
   --panel:#1B1D22;
   --panel-2:#24272D;
@@ -44,6 +45,7 @@
 }
 /* paper look: warm white sheet, light blue grid, dark ink */
 :root[data-ui="paper"]{
+  --caret:#0A5FD0;
   --bg:#F7F5F0;
   --panel:#FFFFFF;
   --panel-2:#EFECE6;
@@ -115,7 +117,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .item{position:absolute;--fill:#24272C;--line-c:var(--rule-strong);--ink:#E9E6DF}
 .item .content{outline:none;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;color:var(--ink);line-height:1.4;min-height:1.4em}
 .item .content:empty::before{content:attr(data-ph);color:var(--muted)}
-.item.editing .content,.item.editing .title{user-select:text;-webkit-user-select:text;cursor:text;caret-color:var(--accent)}
+.item.editing .content,.item.editing .title{user-select:text;-webkit-user-select:text;cursor:text;caret-color:var(--caret)}
 /* while a text is edited, the canvas allows selection on the way down to it – Safari and Firefox hide the caret
    inside an element whose ancestors forbid selection; everything else stays unselectable */
 #viewport.texting{user-select:text;-webkit-user-select:text}
