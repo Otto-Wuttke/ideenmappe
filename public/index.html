@@ -507,7 +507,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
     <button data-v="1">1×</button><button data-v="2">2×</button><button data-v="3">3×</button>
   </div></div>
   <div class="erow"><span class="elab">Hintergrund</span><div class="seg" data-k="bg">
-    <button data-v="dark">Dunkel</button><button data-v="none">Transparent</button>
+    <button data-v="white">Weiß</button><button data-v="paper">Papierton</button><button data-v="none">Transparent</button>
   </div></div>
   <p class="enote" id="expNote"></p>
   <button class="ebtn" id="expGo">Exportieren</button>
@@ -2866,7 +2866,8 @@ $('#scCustom').addEventListener('change',e=>{
 $('#scCustom').addEventListener('keydown',e=>{ if(e.key==='Enter') e.target.blur(); e.stopPropagation(); });
 
 /* ---------- export ---------- */
-const exp=Object.assign({area:'board',fmt:'png',scale:'2',bg:'dark'},lsGet('ideenmappe:export',{}));
+const exp=Object.assign({area:'board',fmt:'png',scale:'2',bg:'white'},lsGet('ideenmappe:export',{}));
+if(exp.bg==='dark') exp.bg='white'; // older setting: exports are white like a printed page now
 const expPanel=$('#exportPanel');
 const JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 let jspdfP=null;
@@ -2888,7 +2889,7 @@ function regionFor(area){
 }
 function refreshExport(){
   if(exp.area==='sel'&&!sel.size) exp.area='board';
-  if(exp.fmt!=='png'&&exp.bg==='none') exp.bg='dark';
+  if(exp.fmt!=='png'&&exp.bg==='none') exp.bg='white';
   expPanel.querySelectorAll('.seg').forEach(seg=>{
     const k=seg.dataset.k;
     seg.querySelectorAll('button').forEach(b=>{
@@ -3082,7 +3083,7 @@ async function doExport(R,only){
     try{ await document.fonts.ready; }catch(e){}
     let s=+exp.scale||2;
     s=Math.min(s,Math.sqrt(36e6/(R.w*R.h)),16000/R.w,16000/R.h);
-    const c=await asPaper(()=>rasterize(R,s,(exp.fmt==='png'&&exp.bg==='none')?null:UI.bg,only));
+    const c=await asPaper(()=>rasterize(R,s,(exp.fmt==='png'&&exp.bg==='none')?null:exp.bg==='paper'?UI.bg:'#FFFFFF',only));
     let blob;
     if(exp.fmt==='png') blob=await toBlobP(c,'image/png');
     else if(exp.fmt==='jpg') blob=await toBlobP(c,'image/jpeg',0.92);

@@ -4,7 +4,7 @@
 
 - Führungslinien für Textboxen: Textbox auswählen, den Griff links daneben auf ein Objekt oder eine Stelle ziehen. Die Linie beginnt am Text mit einem kurzen waagrechten Ansatz und endet mit Punkt oder Pfeil (umschaltbar in der Leiste). Endet sie auf einem Objekt, wandert sie mit, wenn es verschoben oder vergrößert wird. Mehrere Linien pro Textbox; ein Ende zurück auf die Textbox ziehen entfernt die Linie. Auch im Export.
 - Dunkelmodus: Alle Farben werden hell dargestellt, auch die aus dem Farbfächer (Helligkeit umgekehrt, Farbton bleibt): Schwarz auf Papier ist im Dunkelmodus hell. Gespeichert wird immer die Papierfarbe.
-- Export (PNG, JPG, PDF) sieht immer aus wie auf Papier, auch wenn er im Dunkelmodus erstellt wird.
+- Export (PNG, JPG, PDF) sieht immer aus wie auf Papier, auch wenn er im Dunkelmodus erstellt wird. Hintergrund standardmäßig reinweiß wie eine Druckseite; wahlweise Papierton oder (PNG) transparent.
 - Skizzen und Notizen auf PDF-Seiten und Bildern behalten im Dunkelmodus ihre Papierfarben, weil die Seite darunter hell bleibt.
 - Textboxen: Der Cursor ist beim Bearbeiten gut sichtbar (kräftiges Blau statt Akzentfarbe), auch in Safari und Firefox, und steht gleich am Textende.
 - Kopien herausziehen: Mit gedrückter Strg-Taste (Mac: ⌘ oder ⌥) ein Objekt oder eine Auswahl ziehen erzeugt eine Kopie, das Original bleibt liegen. An Bildern und PDF-Seiten angeheftete Skizzen und Verbindungen innerhalb der Auswahl kommen mit. Ein Klick ohne Ziehen erzeugt keine Kopie; Rückgängig entfernt die Kopie in einem Schritt.
