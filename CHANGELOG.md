@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.0.5 Beta – 20. November 2026
+
+- Kopien herausziehen: Mit gedrückter Strg-Taste (Mac: ⌘ oder ⌥) ein Objekt oder eine Auswahl ziehen erzeugt eine Kopie, das Original bleibt liegen. An Bildern und PDF-Seiten angeheftete Skizzen und Verbindungen innerhalb der Auswahl kommen mit. Ein Klick ohne Ziehen erzeugt keine Kopie; Rückgängig entfernt die Kopie in einem Schritt.
+
 ## 1.0.4 Beta – 18. November 2026
 
 - Lineal wie in Concepts: endlos, es geht bei jeder Zoomstufe durch den ganzen Bildschirm. Die Drehpunkte haben einen festen Abstand zum Verschiebepunkt und sind so immer bedienbar. Die Teilung wird je nach Zoom feiner oder gröber; die Zahlen zählen vom Verschiebepunkt aus.

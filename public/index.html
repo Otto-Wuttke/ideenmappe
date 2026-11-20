@@ -376,6 +376,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 :root[data-ui="paper"] #dock,:root[data-ui="paper"] #wheel,:root[data-ui="paper"] #ctx,:root[data-ui="paper"] #pager,:root[data-ui="paper"] #colorFan,:root[data-ui="paper"] #exportPanel,:root[data-ui="paper"] #scalePanel,:root[data-ui="paper"] #perspPanel,:root[data-ui="paper"] #pastePad{box-shadow:0 10px 30px -14px var(--shadow),0 1px 2px rgba(60,50,30,.08)}
 :root[data-ui="paper"] .t-note{box-shadow:0 1px 0 rgba(60,50,30,.12),0 8px 20px -14px var(--shadow)}
 :root[data-ui="paper"] #wheel.fanning{box-shadow:none}
+#viewport.copying,#viewport.copying *{cursor:copy!important}
 #viewport::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .40 0 0 0 0 .32 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:220px 220px;mix-blend-mode:multiply}
 :root[data-ui="paper"] #viewport::before{opacity:.22}
 :root[data-ui="paper"] .t-text.pinned .content{box-shadow:0 0 0 1px var(--rule),0 2px 8px rgba(60,50,30,.15)}
@@ -559,6 +560,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
       <h3>Bearbeiten</h3>
       <dt>⌘Z · ⇧⌘Z</dt><dd>Rückgängig, wiederholen</dd>
       <dt>⌘D · Entf</dt><dd>Duplizieren, löschen</dd>
+      <dt>Strg/⌘/⌥ + Ziehen</dt><dd>Kopie herausziehen</dd>
       <dt>G</dt><dd>Punkte → Raster mit Einrasten (20 px) → leer</dd>
       <dt>Esc</dt><dd>Auswahl aufheben, danach ein Board nach oben</dd>
     </dl>
@@ -1605,15 +1607,20 @@ function deleteSel(){
   sel=new Set(); markDirty(); render();
 }
 function duplicate(){
-  const s=selItems().filter(i=>i.type!=='link'); if(!s.length) return;
-  pushHistory();
+  if(!selItems().some(i=>i.type!=='link')) return;
+  pushHistory(); copySelection(24,24); render();
+}
+// copies of the selection (with sketches pinned to them and links between them), shifted by dx/dy; selects the copies
+function copySelection(dx,dy){
+  const s=selItems().filter(i=>i.type!=='link'); if(!s.length) return [];
   const map=new Map(), out=[];
-  s.forEach(i=>{const c=cloneData(i);c.id=nid(i.type[0]);c.x+=24;c.y+=24;map.set(i.id,c.id);out.push(c);});
+  s.forEach(i=>{const c=cloneData(i);c.id=nid(i.type[0]);c.x+=dx;c.y+=dy;map.set(i.id,c.id);out.push(c);});
   // sketches pinned to a duplicated PDF/image come along (all pages)
   items().forEach(k=>{ if(isPinned(k)&&map.has(k.att)&&!map.has(k.id)){ const c=cloneData(k); c.id=nid(k.type[0]); map.set(k.id,c.id); out.push(c); } });
   out.forEach(c=>{ if(isPinned(c)){ if(map.has(c.att)) c.att=map.get(c.att); else relFromAbs(c,find(c.att)); } });
   items().forEach(l=>{if(l.type==='link'&&map.has(l.from)&&map.has(l.to)){const c=cloneData(l);c.id=nid('l');c.from=map.get(l.from);c.to=map.get(l.to);out.push(c);}});
-  board().items.push(...out); sel=new Set(out.filter(i=>i.type!=='link').map(i=>i.id)); markDirty(); render();
+  board().items.push(...out); sel=new Set(out.filter(i=>i.type!=='link').map(i=>i.id)); markDirty();
+  return out;
 }
 function pruneSel(){const l=items();for(const id of [...sel]) if(!l.some(i=>i.id===id)) sel.delete(id);}
 
@@ -1814,6 +1821,7 @@ window.addEventListener('pointerdown',e=>{ if(e.pointerType==='pen') penSeen=Dat
 window.addEventListener('pointerup',e=>{ if(e.pointerType==='pen') penSeen=Date.now(); },true);
 window.addEventListener('pointermove',e=>{ if(e.pointerType==='pen'&&e.buttons) penSeen=Date.now(); },true);
 const palmLikely=e=>e.pointerType==='touch'&&Date.now()-penSeen<2000;
+vp.addEventListener('contextmenu',e=>{ if(e.ctrlKey&&!isEditTarget(e.target)) e.preventDefault(); });
 vp.addEventListener('pointerdown',e=>{
   if(isEditTarget(e.target)) return;
   if(editing) commitEdit();
@@ -1865,7 +1873,8 @@ vp.addEventListener('pointerdown',e=>{
     if(e.shiftKey){ sel.has(it.id)?sel.delete(it.id):sel.add(it.id); render(); if(!sel.has(it.id)) return; }
     else if(!sel.has(it.id)){ sel=new Set([it.id]); render(); }
     const movers=selItems().filter(i=>i.type!=='link').map(i=>({i,x:i.x,y:i.y}));
-    action={...base,type:'move',movers,hit:it.id,hist:false};
+    // Ctrl (Windows), ⌘ or ⌥ (Mac) held: dragging pulls out a copy, the original stays
+    action={...base,type:'move',movers,hit:it.id,hist:false,copy:e.ctrlKey||e.metaKey||e.altKey};
     return;
   }
   if(e.pointerType==='touch'){ action={...base,type:'pan',v0:{...view},tapEmpty:true}; return; }
@@ -1889,7 +1898,9 @@ vp.addEventListener('pointermove',e=>{
     case 'erase': eraseAt(w); break;
     case 'move':{
       if(!action.moved) break;
-      if(!action.hist){pushHistory();action.hist=true;}
+      if(!action.hist){pushHistory();action.hist=true;
+        if(action.copy){ const out=copySelection(0,0); action.movers=out.filter(i=>i.type!=='link').map(i=>({i,x:i.x,y:i.y})); vp.classList.add('copying'); }
+      }
       const dx=w.x-action.w0.x, dy=w.y-action.w0.y;
       action.movers.forEach(m=>{m.i.x=m.x+dx;m.i.y=m.y+dy;});
       action.movers.forEach(m=>{ if(isPinned(m.i)) relFromAbs(m.i); });
@@ -1941,6 +1952,7 @@ function endPointer(e,cancelled){
   switch(a.type){
     case 'draw': finishStroke(a); break;
     case 'move':
+      vp.classList.remove('copying');
       if(a.moved){
         if(prefs.grid==='grid') a.movers.forEach(m=>{ if(m.i.type!=='ink'){m.i.x=Math.round(m.i.x/gridPx())*gridPx();m.i.y=Math.round(m.i.y/gridPx())*gridPx();} });
         // a sketch, text or note dragged onto or off a PDF page / image is pinned or released
