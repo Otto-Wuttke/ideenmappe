@@ -2,6 +2,7 @@
 
 ## 1.0.5 Beta – 20. November 2026
 
+- Führungslinien für Textboxen: Textbox auswählen, den Griff links daneben auf ein Objekt oder eine Stelle ziehen. Die Linie beginnt am Text mit einem kurzen waagrechten Ansatz und endet mit Punkt oder Pfeil (umschaltbar in der Leiste). Endet sie auf einem Objekt, wandert sie mit, wenn es verschoben oder vergrößert wird. Mehrere Linien pro Textbox; ein Ende zurück auf die Textbox ziehen entfernt die Linie. Auch im Export.
 - Dunkelmodus: Alle Farben werden hell dargestellt, auch die aus dem Farbfächer (Helligkeit umgekehrt, Farbton bleibt): Schwarz auf Papier ist im Dunkelmodus hell. Gespeichert wird immer die Papierfarbe.
 - Export (PNG, JPG, PDF) sieht immer aus wie auf Papier, auch wenn er im Dunkelmodus erstellt wird.
 - Skizzen und Notizen auf PDF-Seiten und Bildern behalten im Dunkelmodus ihre Papierfarben, weil die Seite darunter hell bleibt.

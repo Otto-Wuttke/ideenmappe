@@ -153,6 +153,9 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .handle{position:absolute;background:var(--bg);border-style:solid;border-color:var(--accent);pointer-events:auto;touch-action:none}
 .handle.resize{cursor:nwse-resize}
 .handle.link{border-radius:50%;cursor:crosshair;background:var(--accent)}
+.handle.lead{border-radius:50%;cursor:crosshair;background:var(--bg)}
+.handle.lead::after{content:'';position:absolute;inset:25%;border-radius:50%;background:var(--accent)}
+.handle.leadend{border-radius:50%;cursor:move;background:var(--accent);opacity:.9}
 .dims{position:absolute;font-family:var(--font-mono);color:var(--bg);background:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
 #marquee{position:fixed;border:1px solid var(--accent);background:rgba(242,181,68,.08);pointer-events:none;display:none;z-index:5}
 
@@ -400,7 +403,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
     <svg id="persp" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
     <svg id="links" xmlns="http://www.w3.org/2000/svg"><defs id="linkDefs"></defs><g id="linkItems"></g><path id="tmpLink" fill="none" stroke="#F2B544" stroke-width="1.75" stroke-dasharray="6 5"></path></svg>
     <div id="items"></div>
-    <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="inkItems"></g><g id="tmpInk"></g></svg>
+    <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="leadItems"></g><path id="tmpLead" fill="none" stroke="#F2B544" stroke-width="1.5" stroke-dasharray="5 4"></path><g id="inkItems"></g><g id="tmpInk"></g></svg>
     <div id="overlay"></div>
   </div>
 </div>
@@ -568,6 +571,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
       <dt>⌘Z · ⇧⌘Z</dt><dd>Rückgängig, wiederholen</dd>
       <dt>⌘D · Entf</dt><dd>Duplizieren, löschen</dd>
       <dt>Strg/⌘/⌥ + Ziehen</dt><dd>Kopie herausziehen</dd>
+      <dt>Textbox: Griff links</dt><dd>Führungslinie zu einem Objekt ziehen</dd>
       <dt>G</dt><dd>Punkte → Raster mit Einrasten (20 px) → leer</dd>
       <dt>Esc</dt><dd>Auswahl aufheben, danach ein Board nach oben</dd>
     </dl>
@@ -593,6 +597,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 'use strict';
 const $=s=>document.querySelector(s);
 const vp=$('#viewport'), world=$('#world'), itemsEl=$('#items'), inkG=$('#inkItems'), tmpInk=$('#tmpInk');
+const leadG=$('#leadItems'), tmpLead=$('#tmpLead');
 const linkG=$('#linkItems'), linkDefs=$('#linkDefs'), tmpLink=$('#tmpLink'), overlay=$('#overlay'), marq=$('#marquee');
 const SVGNS='http://www.w3.org/2000/svg';
 
@@ -1182,7 +1187,7 @@ function render(){
   }
   for(const [id,el] of els) if(!seen.has(id)){ el.remove(); els.delete(id); }
   for(const it of list) if(it.type==='text'||it.type==='note'){ const el=els.get(it.id); if(el) it.h=el.offsetHeight; }
-  renderInk(list); renderLinks(list); renderOverlay(); renderCtx(); renderPager();
+  renderInk(list); renderLinks(list); renderLeads(list); renderOverlay(); renderCtx(); renderPager();
 }
 function pageHasNotes(p,pg){ return items().some(i=>isPinned(i)&&i.att===p.id&&i.pg===pg); }
 /* Fixed page bar for the PDF you are working on: stays put while you zoom, pan or draw */
@@ -1452,6 +1457,74 @@ function renderLinks(list){
   }
   linkG.innerHTML=h;
 }
+/* ---------- leader lines: a text box labels a point on an object ---------- */
+// it.leads=[{x,y,to?,rx?,ry?,end:'dot'|'arrow'}] – with "to" the end sits at (rx,ry) of that object's box and follows it
+const LEAD_SH=14;
+// the leader starts at the written text, not at the (often wider) box: measure the first line on screen
+function textBoxRect(it){
+  const b=bbox(it); if(!b) return null;
+  const el=els.get(it.id), c=el&&el.firstChild;
+  if(c&&c.firstChild&&c.textContent.trim()){
+    try{
+      const r=document.createRange(); r.selectNodeContents(c);
+      const rs=[...r.getClientRects()].filter(q=>q.width>0), er=el.getBoundingClientRect(), z=view.z;
+      if(rs.length&&er.width){
+        const f=rs[0], left=Math.min(...rs.map(q=>q.left)), right=Math.max(...rs.map(q=>q.right)), bottom=Math.max(...rs.map(q=>q.bottom));
+        const k=b.w/(er.width/z)/z; // world units per screen px (also right while the box is scaled)
+        return {x:b.x+(left-er.left)*k-3,y:b.y+(f.top-er.top)*k,w:(right-left)*k+6,h:(bottom-f.top)*k,ly:b.y+(f.top-er.top+f.height/2)*k,lr:b.x+(f.right-er.left)*k+3};
+      }
+    }catch(e){}
+  }
+  return b;
+}
+function leadEndPt(L,byId){
+  if(L.to){ const t=byId.get(L.to), tb=t&&bbox(t); if(tb){ L.x=tb.x+L.rx*tb.w; L.y=tb.y+L.ry*tb.h; } }
+  return {x:L.x,y:L.y};
+}
+function leadPts(it,L,byId,B){
+  const b=B||textBoxRect(it), E=leadEndPt(L,byId), fs=it.fs||18;
+  const yy=b.ly!=null?b.ly:b.y+Math.min(b.h/2,fs*0.72+4), left=E.x<b.x+b.w/2;
+  const sx=left?b.x-3:(b.lr!=null?b.lr:b.x+b.w)+3, kx=left?sx-LEAD_SH:sx+LEAD_SH, P=[[sx,yy]];
+  if(left?E.x<kx:E.x>kx) P.push([kx,yy]);
+  P.push([E.x,E.y]); return P;
+}
+function leadHead(P,end){ // arrow triangle or dot at the end, as points / circle
+  const e=P[P.length-1], f=P[P.length-2], len=Math.hypot(e[0]-f[0],e[1]-f[1])||1, ux=(e[0]-f[0])/len, uy=(e[1]-f[1])/len;
+  if(end==='arrow'){ const bx=e[0]-ux*9, by=e[1]-uy*9; return {tri:[[e[0],e[1]],[bx-uy*3.6,by+ux*3.6],[bx+uy*3.6,by-ux*3.6]],line:[bx+ux*1,by+uy*1]}; }
+  return {dot:[e[0],e[1],2.8]};
+}
+function renderLeads(list){
+  const byId=new Map(list.map(i=>[i.id,i])); let h='';
+  for(const it of list){
+    if(it.type!=='text'||!it.leads||!it.leads.length||!inkVisible(it)) continue;
+    const b=textBoxRect(it); if(!b) continue;
+    const P0=pal(it), col=sel.has(it.id)?'#F2B544':(P0[it.color]||P0.graphite).ink;
+    for(const L of it.leads){
+      const P=leadPts(it,L,byId,b), H=leadHead(P,L.end), Q=P.slice(); if(H.line) Q[Q.length-1]=H.line;
+      const d='M'+Q.map(p=>p[0]+' '+p[1]).join(' L'), dh='M'+P.map(p=>p[0]+' '+p[1]).join(' L');
+      h+=`<g data-id="${it.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>`
+        +(H.tri?`<path d="M${H.tri.map(p=>p.join(' ')).join(' L')}Z" fill="${col}"/>`:`<circle cx="${H.dot[0]}" cy="${H.dot[1]}" r="${H.dot[2]}" fill="${col}"/>`)
+        +`<path class="hit" d="${dh}" stroke-width="14" vector-effect="non-scaling-stroke"/></g>`;
+    }
+  }
+  leadG.innerHTML=h;
+}
+// what a leader end dropped at this screen point points to (not the label itself, not lines)
+function leadTarget(cx,cy,self){
+  for(const el of document.elementsFromPoint(cx,cy)){
+    if(el.closest('#overlay,#leadItems,#links,#tmpInk')) continue;
+    const t=el.closest('[data-id]'); if(!t) continue;
+    const o=find(t.dataset.id); if(!o||o.id===self.id||o.type==='link') continue;
+    return o;
+  }
+  return null;
+}
+function makeLead(self,w,cx,cy,end){
+  const b=textBoxRect(self); if(b&&w.x>=b.x&&w.x<=b.x+b.w&&w.y>=b.y&&w.y<=b.y+b.h) return null; // dropped on the label itself
+  const o=leadTarget(cx,cy,self), L={x:w.x,y:w.y,end:end||'dot'};
+  const tb=o&&bbox(o); if(tb&&tb.w>0&&tb.h>0){ L.to=o.id; L.rx=(w.x-tb.x)/tb.w; L.ry=(w.y-tb.y)/tb.h; }
+  return L;
+}
 function renderOverlay(){
   const z=view.z, list=items();
   let h='';
@@ -1466,6 +1539,12 @@ function renderOverlay(){
     if(b){
       const hs=13/z, pad=4/z;
       h+=`<div class="handle resize" data-handle="resize" style="left:${b.x+b.w+pad-hs/2}px;top:${b.y+b.h+pad-hs/2}px;width:${hs}px;height:${hs}px;border-width:${bw}px;border-radius:${3/z}px"></div>`;
+      if(it.type==='text'){
+        const ls=14/z;
+        h+=`<div class="handle lead" data-handle="lead" title="Ziehen für eine Führungslinie" style="left:${b.x-pad-12/z-ls}px;top:${b.y+b.h/2-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
+        if(it.leads&&inkVisible(it)){ const byId=new Map(list.map(i=>[i.id,i])), es=12/z;
+          it.leads.forEach((L,i)=>{ const E=leadEndPt(L,byId); h+=`<div class="handle leadend" data-handle="leadend" data-i="${i}" title="Ende verschieben – auf die Textbox ziehen zum Entfernen" style="left:${E.x-es/2}px;top:${E.y-es/2}px;width:${es}px;height:${es}px;border-width:${bw}px"></div>`; }); }
+      }
       if(it.type!=='ink'){
         const ls=14/z;
         h+=`<div class="handle link" data-handle="link" title="Ziehen zum Verbinden" style="left:${b.x+b.w+pad+12/z}px;top:${b.y+b.h/2-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
@@ -1531,6 +1610,11 @@ function renderCtx(){
     const fs=s[0].fs||18;
     [['S',14],['M',18],['L',28],['XL',44]].forEach(([l,v])=>{h+=`<button class="tb" data-act="fs" data-v="${v}" aria-pressed="${fs===v}">${l}</button>`;});
     h+='<div class="vsep"></div>';
+    const LL=s.flatMap(i=>i.leads||[]);
+    if(LL.length){
+      const en=LL.every(L=>L.end==='arrow')?'arrow':LL.every(L=>L.end!=='arrow')?'dot':'';
+      h+=`<button class="tb" data-act="lend" data-v="dot" aria-pressed="${en==='dot'}" title="Führungslinie endet mit Punkt">● Punkt</button><button class="tb" data-act="lend" data-v="arrow" aria-pressed="${en==='arrow'}" title="Führungslinie endet mit Pfeil">→ Pfeil</button><button class="tb" data-act="ldel" title="Führungslinien dieser Textbox entfernen">Linien weg</button><div class="vsep"></div>`;
+    }
   }
   if(types.size===1&&types.has('shape')){
     const k=s[0].shape||'rect';
@@ -1562,6 +1646,8 @@ $('#ctx').addEventListener('click',e=>{
   const a=b.dataset.act, v=b.dataset.v, s=selItems(); if(!s.length) return;
   if(a==='color'){pushHistory();s.forEach(i=>{ if(['text','note','shape','ink','link'].includes(i.type)) i.color=v; });}
   else if(a==='fs'){pushHistory();s.forEach(i=>i.fs=+v);}
+  else if(a==='lend'){pushHistory();s.forEach(i=>(i.leads||[]).forEach(L=>L.end=v));}
+  else if(a==='ldel'){pushHistory();s.forEach(i=>delete i.leads);}
   else if(a==='shape'){pushHistory();s.forEach(i=>i.shape=v);}
   else if(a==='lstyle'){pushHistory();s.forEach(i=>i.style=v);}
   else if(a==='flip'){pushHistory();s.forEach(i=>{const t=i.from;i.from=i.to;i.to=t;});}
@@ -1596,7 +1682,7 @@ function startEdit(id){
   if(it.type!=='board'){ const t=c.lastChild; if(t&&t.nodeType===3){ r.setStart(t,t.length); r.collapse(true); } else r.collapse(false); }
   const s=getSelection(); s.removeAllRanges(); s.addRange(r);
   c.addEventListener('blur',commitEdit,{once:true});
-  c.oninput=()=>{ if(it.type==='text'||it.type==='note'){ it.h=el.offsetHeight; renderLinks(items()); renderOverlay(); } };
+  c.oninput=()=>{ if(it.type==='text'||it.type==='note'){ it.h=el.offsetHeight; renderLinks(items()); renderLeads(items()); renderOverlay(); } };
 }
 function commitEdit(){
   if(!editing) return;
@@ -1651,6 +1737,7 @@ function copySelection(dx,dy){
   // sketches pinned to a duplicated PDF/image come along (all pages)
   items().forEach(k=>{ if(isPinned(k)&&map.has(k.att)&&!map.has(k.id)){ const c=cloneData(k); c.id=nid(k.type[0]); map.set(k.id,c.id); out.push(c); } });
   out.forEach(c=>{ if(isPinned(c)){ if(map.has(c.att)) c.att=map.get(c.att); else relFromAbs(c,find(c.att)); } });
+  out.forEach(c=>{ (c.leads||[]).forEach(L=>{ if(L.to&&map.has(L.to)) L.to=map.get(L.to); else if(!L.to){ L.x+=dx; L.y+=dy; } }); });
   items().forEach(l=>{if(l.type==='link'&&map.has(l.from)&&map.has(l.to)){const c=cloneData(l);c.id=nid('l');c.from=map.get(l.from);c.to=map.get(l.to);out.push(c);}});
   board().items.push(...out); sel=new Set(out.filter(i=>i.type!=='link').map(i=>i.id)); markDirty();
   return out;
@@ -1894,6 +1981,8 @@ vp.addEventListener('pointerdown',e=>{
   if(handle==='resize'&&sel.size===1){
     const s=selItems()[0]; action={...base,type:'resize',it:s,o:{...bbox(s)},hist:false}; return;
   }
+  if(handle==='lead'&&sel.size===1){ action={...base,type:'lead',from:[...sel][0]}; return; }
+  if(handle==='leadend'&&sel.size===1){ action={...base,type:'leadEnd',from:[...sel][0],i:+t.dataset.i}; return; }
   if(handle==='link'&&sel.size===1){ action={...base,type:'link',from:[...sel][0]}; return; }
   if(tool==='link'){
     if(it&&it.type!=='link'&&it.type!=='ink'){ action={...base,type:'link',from:it.id}; return; }
@@ -1965,6 +2054,16 @@ vp.addEventListener('pointermove',e=>{
       }
       break;
     }
+    case 'lead':{
+      const a=find(action.from); if(!a) break;
+      const P=leadPts(a,{x:w.x,y:w.y},new Map());
+      tmpLead.setAttribute('d','M'+P.map(p=>p[0]+' '+p[1]).join(' L')); tmpLead.setAttribute('stroke-width',1.5); break;
+    }
+    case 'leadEnd':{
+      const a=find(action.from); if(!a||!a.leads||!a.leads[action.i]) break;
+      if(!action.hist){ pushHistory(); action.hist=true; }
+      const L=a.leads[action.i]; delete L.to; L.x=w.x; L.y=w.y; renderLeads(items()); renderOverlay(); break;
+    }
     case 'link':{
       const a=find(action.from); if(!a) break;
       const A=bbox(a), c=center(A), s=edgePt(a,A,w.x,w.y,5);
@@ -1981,7 +2080,7 @@ function endPointer(e,cancelled){
   const a=action; action=null; vp.classList.remove('panning');
   const w=toWorld(e.clientX,e.clientY);
   showMeasure(null);
-  if(cancelled){ if(a.type==='draw'){ clearTimeout(a.holdT); clearTmp(); } if(a.type==='link') tmpLink.setAttribute('d',''); marq.style.display='none'; render(); return; }
+  if(cancelled){ if(a.type==='draw'){ clearTimeout(a.holdT); clearTmp(); } if(a.type==='link') tmpLink.setAttribute('d',''); if(a.type==='lead') tmpLead.setAttribute('d',''); marq.style.display='none'; render(); return; }
   switch(a.type){
     case 'draw': finishStroke(a); break;
     case 'move':
@@ -2014,6 +2113,19 @@ function endPointer(e,cancelled){
         createAt(a.kind,x,y,Math.abs(w.x-a.w0.x),Math.abs(w.y-a.w0.y));
       }else if(!a.moved) createAt(a.kind,w.x,w.y);
       setTool('select'); break;
+    }
+    case 'lead':{
+      tmpLead.setAttribute('d','');
+      const it=find(a.from); if(!it||!a.moved) break;
+      const L=makeLead(it,w,e.clientX,e.clientY,(it.leads&&it.leads.length)?it.leads[it.leads.length-1].end:'dot');
+      if(L){ pushHistory(); (it.leads=it.leads||[]).push(L); markDirty(); render(); }
+      break;
+    }
+    case 'leadEnd':{
+      const it=find(a.from); if(!it||!it.leads||!a.moved) break;
+      const old=it.leads[a.i], L=makeLead(it,w,e.clientX,e.clientY,old&&old.end);
+      if(L) it.leads[a.i]=L; else { it.leads.splice(a.i,1); if(!it.leads.length) delete it.leads; toast('Führungslinie entfernt.'); }
+      markDirty(); render(); break;
     }
     case 'link':{
       tmpLink.setAttribute('d','');
@@ -2950,6 +3062,14 @@ async function rasterize(R,s,bg,only){
   }
   // cards, text, shapes, images, PDFs, boards (same order as on screen)
   for(const it of domOrder(list)){ if(take(it)&&inR(it)) await drawDom(g,it,s); }
+  // leader lines over the objects they label
+  { const byId=new Map(list.map(i=>[i.id,i]));
+    for(const it of list){ if(it.type!=='text'||!it.leads||!take(it)||!inkVisible(it)) continue;
+      const P0=pal(it), col=(P0[it.color]||P0.graphite).ink, b=textBoxRect(it); if(!b) continue;
+      for(const L of it.leads){ const P=leadPts(it,L,byId,b), H=leadHead(P,L.end), Q=P.slice(); if(H.line) Q[Q.length-1]=H.line;
+        g.strokeStyle=col; g.fillStyle=col; g.lineWidth=1.3; g.lineJoin='round'; g.lineCap='round'; g.globalAlpha=1;
+        g.beginPath(); g.moveTo(Q[0][0],Q[0][1]); Q.slice(1).forEach(p=>g.lineTo(p[0],p[1])); g.stroke();
+        g.beginPath(); if(H.tri){ g.moveTo(...H.tri[0]); g.lineTo(...H.tri[1]); g.lineTo(...H.tri[2]); g.closePath(); } else g.arc(H.dot[0],H.dot[1],H.dot[2],0,Math.PI*2); g.fill(); } } }
   // sketches on top, like on screen
   for(const it of list){ if(it.type==='ink'&&take(it)&&inR(it)) await drawInkTo(g,it); }
   return c;
