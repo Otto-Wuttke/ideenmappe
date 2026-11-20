@@ -116,6 +116,10 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .item .content{outline:none;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;color:var(--ink);line-height:1.4;min-height:1.4em}
 .item .content:empty::before{content:attr(data-ph);color:var(--muted)}
 .item.editing .content,.item.editing .title{user-select:text;-webkit-user-select:text;cursor:text;caret-color:var(--accent)}
+/* while a text is edited, the canvas allows selection on the way down to it – Safari and Firefox hide the caret
+   inside an element whose ancestors forbid selection; everything else stays unselectable */
+#viewport.texting{user-select:text;-webkit-user-select:text}
+#viewport.texting>*:not(#world),#viewport.texting #world>*:not(#items),#viewport.texting .item:not(.editing),#viewport.texting .item:not(.editing) *{user-select:none;-webkit-user-select:none}
 .t-text .content{padding:4px 6px}
 .t-text.pinned .content{display:inline-block;max-width:100%;vertical-align:top;background:var(--label-bg);border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .t-note{background:var(--fill);border:1px solid var(--line-c);border-radius:10px;padding:12px 14px;box-shadow:0 1px 0 rgba(0,0,0,.35),0 8px 24px -12px rgba(0,0,0,.6)}
@@ -1559,15 +1563,18 @@ function startEdit(id){
   editing={id,bid:cur};
   el.classList.add('editing'); sel=new Set([id]); renderOverlay(); renderCtx();
   c.contentEditable=plainOK?'plaintext-only':'true';
+  vp.classList.add('texting');
   c.focus({preventScroll:true});
-  const r=document.createRange(); r.selectNodeContents(c); if(it.type!=='board') r.collapse(false);
+  // caret at the end of the text, inside the last text node (some browsers draw no caret at an element boundary)
+  const r=document.createRange(); r.selectNodeContents(c);
+  if(it.type!=='board'){ const t=c.lastChild; if(t&&t.nodeType===3){ r.setStart(t,t.length); r.collapse(true); } else r.collapse(false); }
   const s=getSelection(); s.removeAllRanges(); s.addRange(r);
   c.addEventListener('blur',commitEdit,{once:true});
   c.oninput=()=>{ if(it.type==='text'||it.type==='note'){ it.h=el.offsetHeight; renderLinks(items()); renderOverlay(); } };
 }
 function commitEdit(){
   if(!editing) return;
-  const {id,bid}=editing; editing=null;
+  const {id,bid}=editing; editing=null; vp.classList.remove('texting');
   const b=boards[bid]; const it=b&&b.items.find(i=>i.id===id); const el=els.get(id);
   if(!it||!el){render();return;}
   const c=el.querySelector(it.type==='board'?'.title':'.content');
