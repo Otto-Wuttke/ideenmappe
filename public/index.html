@@ -366,6 +366,9 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #ruler svg{display:block}
 #ruler .rbody{fill:var(--tool-body);stroke:var(--rule-strong);stroke-width:calc(1px / var(--z,1));pointer-events:auto}
 #ruler .rticks{stroke:var(--ink2);stroke-width:calc(1px / var(--z,1));fill:none;pointer-events:none}
+/* grip areas of ruler and template knobs, in screen space: always 44 px, at any zoom */
+#ghits{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ghit{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;pointer-events:auto;touch-action:none;cursor:grab}
 #ruler .rlab{fill:var(--ink2);font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:500;pointer-events:none}
 #ruler .rgrip circle,#ruler .rknob circle{fill:#F2B544;pointer-events:auto;cursor:grab}
 #ruler .rgrip path,#ruler .rknob path{stroke:#1A1407;stroke-width:calc(1.6px / var(--z,1));fill:none;pointer-events:none}
@@ -409,6 +412,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
     <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="leadItems"></g><path id="tmpLead" fill="none" stroke="#F2B544" stroke-width="1.5" stroke-dasharray="5 4"></path><g id="inkItems"></g><g id="tmpInk"></g></svg>
     <div id="overlay"></div>
   </div>
+  <div id="ghits"></div>
 </div>
 <div id="marquee"></div>
 
@@ -2547,7 +2551,7 @@ function lehreWorld(u,v){ const c=Math.cos(lehre.a), s=Math.sin(lehre.a); return
 function ellPoint(rx,ry,phi){ const c=Math.cos(phi), s=Math.sin(phi), r=rx*ry/Math.sqrt((ry*c)**2+(rx*s)**2); return {x:c*r,y:s*r}; }
 function lehreLabel(){ return isCircle()?'R '+fmtLen(lehre.rx):fmtVal(lehre.rx*2)+' × '+fmtVal(lehre.ry*2)+' '+scaleOf().unit; }
 function renderLehre(){
-  if(!lehre.on){ lehreEl.style.display='none'; return; }
+  if(!lehre.on){ lehreEl.style.display='none'; syncGuideHits(); return; }
   if(!lehreEl.parentNode) world.appendChild(lehreEl);
   lehreEl.style.display='block';
   // the template keeps its size on screen at any zoom (like the ruler): its radii are in world units, so they
@@ -2556,7 +2560,7 @@ function renderLehre(){
   lehre.z=view.z;
   const z=view.z, rx=lehre.rx, ry=lehre.ry, B=34/z, S=Math.max(rx,ry)+B;
   Object.assign(lehreEl.style,{left:(lehre.x-S)+'px',top:(lehre.y-S)+'px',width:S*2+'px',height:S*2+'px',transform:`rotate(${lehre.a}rad)`,transformOrigin:'50% 50%'});
-  const key=[z,rx,ry,scaleLabel()].join('|'); if(key===lehreKey) return; lehreKey=key;
+  const key=[z,rx,ry,scaleLabel()].join('|'); if(key===lehreKey){ syncGuideHits(); return; } lehreKey=key;
   const ell=(a,b)=>`M${S-a} ${S}a${a} ${b} 0 1 0 ${a*2} 0a${a} ${b} 0 1 0 ${-a*2} 0Z`;
   let ticks='', labs='';
   for(let dg=0;dg<360;dg+=5){
@@ -2581,6 +2585,7 @@ function renderLehre(){
     ${knob('rot',S-rx-B*0.5,S,`M${S-rx-B*0.5+u} ${S-u*0.8}a${u} ${u} 0 1 0 0 ${u*1.6}`,'Drehen')}
     <text class="llab" x="${S}" y="${S-ry*0.4}" font-size="${11/z}" text-anchor="middle" dominant-baseline="central">${lehreLabel()}</text>
   </svg>`;
+  syncGuideHits();
 }
 // stroke starting near the edge or on the ring runs along the inside of the edge; returns the offset
 function lehreSnapAt(w){
@@ -2649,6 +2654,20 @@ function toggleRuler(force){
 // division gets finer or coarser with the zoom (1-2-5 steps), numbers count from the ruler's anchor point.
 const RULER_KNOB=150; // screen px from grip to each rotation knob
 let rulerGripU=0;
+const ghits=$('#ghits');
+// Far zoomed in, the knobs are tiny inside the scaled drawing and browsers (above all on the iPad) stop hitting
+// them reliably. Each knob gets an invisible 44 px grip area on top, placed on the screen, not in the drawing.
+function syncGuideHits(){
+  const r=vp.getBoundingClientRect(); let h='';
+  const add=(g,attrs,title)=>{ const c=g.querySelector('circle'); if(!c) return; const b=c.getBoundingClientRect(); if(!b.width) return;
+    const x=b.left+b.width/2-r.left, y=b.top+b.height/2-r.top; if(x<-30||y<-30||x>r.width+30||y>r.height+30) return;
+    h+=`<div class="ghit" ${attrs}${title?` title="${title}"`:''} style="left:${x}px;top:${y}px"></div>`; };
+  if(ruler.on&&rulerEl.isConnected&&rulerEl.style.display!=='none')
+    rulerEl.querySelectorAll('g[data-ruler]').forEach(g=>add(g,`data-ruler="${g.dataset.ruler}"`+(g.dataset.end?` data-end="${g.dataset.end}"`:''),g.dataset.ruler==='move'?'Verschieben':'Drehen'));
+  if(lehre.on&&lehreEl.isConnected&&lehreEl.style.display!=='none')
+    lehreEl.querySelectorAll('g[data-lehre]').forEach(g=>{ const t=g.querySelector('title'); add(g,`data-lehre="${g.dataset.lehre}"`,t?t.textContent:''); });
+  ghits.innerHTML=h;
+}
 function rulerClip(x0,y0,x1,y1){
   const d=rulerDir(); let lo=-1e12, hi=1e12;
   const clip=(p,q)=>{ if(Math.abs(p)<1e-9) return q>=0; const t=q/p; if(p<0){ if(t>hi) return false; if(t>lo) lo=t; }else{ if(t<lo) return false; if(t<hi) hi=t; } return true; };
@@ -2676,9 +2695,9 @@ function rulerGrip(){
   return b>=a?clamp(0,a,b):(lo+hi)/2;
 }
 function renderRuler(){
-  if(!ruler.on){ rulerEl.style.display='none'; return; }
+  if(!ruler.on){ rulerEl.style.display='none'; syncGuideHits(); return; }
   if(!rulerEl.parentNode) world.appendChild(rulerEl);
-  const sp=rulerSpan(); if(!sp){ rulerEl.style.display='none'; return; }
+  const sp=rulerSpan(); if(!sp){ rulerEl.style.display='none'; syncGuideHits(); return; }
   const z=view.z, W=RULER_W/z, d=rulerDir(), [lo,hi]=sp, L=hi-lo, cu=(lo+hi)/2;
   const cx=ruler.x+cu*d.ux, cy=ruler.y+cu*d.uy;
   rulerEl.style.display='block';
@@ -2710,6 +2729,7 @@ function renderRuler(){
     <g data-ruler="rot" data-end="-1" class="rknob" transform="translate(${gx-D} ${W/2})"><circle r="${kr}"/><path d="M${5/z} ${-4/z}a${6/z} ${6/z} 0 1 0 0 ${8/z}"/></g>
   </svg>`;
   rulerEl.querySelectorAll('text').forEach(t=>t.setAttribute('data-ruler','body'));
+  syncGuideHits();
 }
 // Is a stroke starting here meant for the ruler edge? Returns the edge offset (+/-) or null.
 function rulerSnapAt(w){
