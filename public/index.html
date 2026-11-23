@@ -112,7 +112,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #links,#ink{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
 #items{position:absolute;left:0;top:0}
 #overlay{position:absolute;left:0;top:0;pointer-events:none}
-.hit{pointer-events:stroke;stroke:transparent;fill:none;cursor:pointer}
+.hit{pointer-events:stroke;stroke:transparent;fill:none;cursor:pointer;stroke-width:calc(16px / var(--z,1))}
 
 .item{position:absolute;--fill:#24272C;--line-c:var(--rule-strong);--ink:#E9E6DF}
 .item .content{outline:none;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;color:var(--ink);line-height:1.4;min-height:1.4em}
@@ -133,6 +133,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .t-image.tmp img{opacity:.55}
 .t-pdf .page{position:absolute;inset:0;background:#F4F2EE;border-radius:3px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.4),0 10px 28px -12px rgba(0,0,0,.7);display:grid;place-items:center}
 .t-pdf .page canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.t-pdf .page canvas.pdet{inset:auto;pointer-events:none}
 .t-pdf .pmsg{font-size:13px;color:#6B6F78;padding:12px;text-align:center}
 .t-pdf.tmp .page{opacity:.7}
 .t-pdf .pbar{position:absolute;left:0;right:0;top:100%;margin-top:6px;display:flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap}
@@ -938,7 +939,7 @@ function mkInk(abs,color,size){
   let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
   abs.forEach(([x,y])=>{minx=Math.min(minx,x);miny=Math.min(miny,y);maxx=Math.max(maxx,x);maxy=Math.max(maxy,y);});
   const w=Math.max(1,maxx-minx),h=Math.max(1,maxy-miny);
-  const rr=view.z>1.2?r2:r1; // finer storage when zoomed in, so curves stay smooth on screen
+  const q=Math.pow(10,clamp(Math.ceil(Math.log10(view.z*10)),1,4)), rr=v=>Math.round(v*q)/q; // finer storage when zoomed in, so curves stay smooth on screen
   return {id:nid('k'),type:'ink',x:minx,y:miny,w,h,ow:w,oh:h,color,size,pen:true,pts:abs.map(([x,y,p])=>[rr(x-minx),rr(y-miny),Math.round((p??.5)*100)/100])};
 }
 function seedDemo(){
@@ -981,6 +982,10 @@ function seedDemo(){
 
 /* ---------- view ---------- */
 let sharpT=null;
+// brush sizes 0.05 … 80, rounded to two significant digits below 10
+const roundSize=v=>{ v=clamp(v,0.05,80); return v<1?Math.round(v*100)/100:v<10?Math.round(v*10)/10:Math.round(v); };
+const fmtSize=v=>(v<1?Math.round(v*100)/100:v<10?Math.round(v*10)/10:Math.round(v)).toLocaleString('de-DE');
+const ZMIN=0.08, ZMAX=50; // 8 % … 5000 %
 function applyView(){
   // Fast bitmap scaling only while the view is moving; afterwards the browser redraws everything sharp at the current zoom.
   world.style.willChange='transform';
@@ -989,7 +994,7 @@ function applyView(){
   world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
   world.style.setProperty('--z',view.z);
   $('#zoomLabel').textContent=Math.round(view.z*100)+' %';
-  let s=gridPx()*view.z; while(s<9) s*=5;
+  let s=gridPx()*view.z; while(s<9) s*=5; while(s>60) s/=5; // finer cells when zoomed far in
   const g=prefs.grid;
   if(g==='dots'){
     vp.style.backgroundImage=`radial-gradient(circle at 1px 1px, var(--dot) 1.1px, transparent 1.4px)`;
@@ -1014,7 +1019,7 @@ function saveViewSoon(){clearTimeout(viewT);viewT=setTimeout(()=>{views[cur]={..
 function toWorld(cx,cy){const r=vp.getBoundingClientRect();return {x:(cx-r.left-view.x)/view.z,y:(cy-r.top-view.y)/view.z};}
 function viewCenter(){const r=vp.getBoundingClientRect();return toWorld(r.left+r.width/2,r.top+r.height/2);}
 function zoomAt(cx,cy,nz){
-  nz=clamp(nz,0.08,5); const r=vp.getBoundingClientRect();
+  nz=clamp(nz,ZMIN,ZMAX); const r=vp.getBoundingClientRect();
   const wx=(cx-r.left-view.x)/view.z, wy=(cy-r.top-view.y)/view.z;
   view.z=nz; view.x=cx-r.left-wx*nz; view.y=cy-r.top-wy*nz; applyView();
 }
@@ -1401,7 +1406,7 @@ function renderInk(list){
     const p=inkParts(it), col=inkColor(it.color,it), key=p.v+'|'+col+'|'+it.brush;
     if(g.dataset.k!==key){
       g.dataset.k=key;
-      g.innerHTML=partsSVG(p.parts,col,it.id)+`<path class="hit" stroke-width="16" vector-effect="non-scaling-stroke" stroke-linecap="round" d="${p.hit}"/>`;
+      g.innerHTML=partsSVG(p.parts,col,it.id)+`<path class="hit" stroke-linecap="round" d="${p.hit}"/>`;
     }
     g.setAttribute('opacity',(it.op??100)/100);
     g.setAttribute('transform',`translate(${it.x} ${it.y}) scale(${it.w/(it.ow||1)} ${it.h/(it.oh||1)})`);
@@ -1453,7 +1458,7 @@ function renderLinks(list){
     const a=byId.get(l.from), b=byId.get(l.to); if(!a||!b) continue;
     const d=linkPath(a,b,l.style); if(!d) continue;
     const s=sel.has(l.id), C=pal(l)[l.color]||pal(l).graphite, col=s?'#F2B544':C.line;
-    h+=`<g data-id="${l.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="${s?2.25:1.75}" stroke-linejoin="round" marker-end="url(#ah-${s?'accent':(l.color||'graphite')})"/><path class="hit" d="${d}" stroke-width="16" vector-effect="non-scaling-stroke"/></g>`;
+    h+=`<g data-id="${l.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="${s?2.25:1.75}" stroke-linejoin="round" marker-end="url(#ah-${s?'accent':(l.color||'graphite')})"/><path class="hit" d="${d}"/></g>`;
   }
   linkG.innerHTML=h;
 }
@@ -1504,7 +1509,7 @@ function renderLeads(list){
       const d='M'+Q.map(p=>p[0]+' '+p[1]).join(' L'), dh='M'+P.map(p=>p[0]+' '+p[1]).join(' L');
       h+=`<g data-id="${it.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>`
         +(H.tri?`<path d="M${H.tri.map(p=>p.join(' ')).join(' L')}Z" fill="${col}"/>`:`<circle cx="${H.dot[0]}" cy="${H.dot[1]}" r="${H.dot[2]}" fill="${col}"/>`)
-        +`<path class="hit" d="${dh}" stroke-width="14" vector-effect="non-scaling-stroke"/></g>`;
+        +`<path class="hit" d="${dh}"/></g>`;
     }
   }
   leadG.innerHTML=h;
@@ -1796,7 +1801,7 @@ async function drawPdf(it,el){
   const dpr=window.devicePixelRatio||1;
   const want=Math.min(4096,Math.ceil(it.w*dpr*clamp(view.z,0.5,3)));
   const key=it.src+'|'+(it.page||1);
-  if(st.key===key&&st.res>=want*0.75&&st.res<=want*2.5) return;
+  if(st.key===key&&st.res>=want*0.75&&st.res<=want*2.5){ pdfDetail(it,el); return; }
   if(st.busy){st.again=true;return;}
   st.busy=true;
   try{
@@ -1809,14 +1814,38 @@ async function drawPdf(it,el){
     const v=page.getViewport({scale:want/v1.width});
     const c=document.createElement('canvas'); c.width=Math.round(v.width); c.height=Math.round(v.height);
     await page.render({canvasContext:c.getContext('2d'),viewport:v}).promise;
-    const box=el.querySelector('.page'); box.innerHTML=''; box.appendChild(c);
+    const box=el.querySelector('.page'); box.innerHTML=''; box.appendChild(c); st.det=null; st.detKey=null;
     st.key=key; st.res=want;
   }catch(e){
     const box=el.querySelector('.page'); box.innerHTML='<span class="pmsg">PDF kann gerade nicht angezeigt werden.</span>';
     st.key=key; st.res=want;
   }
   st.busy=false;
-  if(st.again){st.again=false;drawPdf(it,el);}
+  if(st.again){st.again=false;drawPdf(it,el);} else pdfDetail(it,el);
+}
+// Far zoomed in, the whole page cannot be rendered sharp (memory). Then the visible part of the page is rendered
+// once more at full resolution and laid over it; it is redone after every pan or zoom.
+async function pdfDetail(it,el){
+  const st=el._pdf||(el._pdf={}), box=el.querySelector('.page'); if(!box) return;
+  const dpr=window.devicePixelRatio||1, sc=view.z*dpr;
+  const drop=()=>{ if(st.det){ st.det.remove(); st.det=null; st.detKey=null; } };
+  if(it.w*sc<=(st.res||0)*1.3) return drop();
+  const r=vp.getBoundingClientRect();
+  const x0=Math.max(0,-view.x/view.z-it.x), y0=Math.max(0,-view.y/view.z-it.y);
+  const x1=Math.min(it.w,(r.width-view.x)/view.z-it.x), y1=Math.min(it.h,(r.height-view.y)/view.z-it.y);
+  if(x1<=x0||y1<=y0) return drop();
+  const W=Math.ceil((x1-x0)*sc), H=Math.ceil((y1-y0)*sc); if(W*H>16e6) return;
+  const key=[it.src,it.page||1,it.w,r2(x0),r2(y0),r2(x1),r2(y1),sc].join('|'); if(st.detKey===key) return;
+  const tok=st.detTok=(st.detTok||0)+1;
+  try{
+    const doc=await getPdf(it.src), page=await doc.getPage(clamp(it.page||1,1,doc.numPages));
+    const v1=page.getViewport({scale:1}), v=page.getViewport({scale:it.w*sc/v1.width,offsetX:-x0*sc,offsetY:-y0*sc});
+    const c=document.createElement('canvas'); c.width=W; c.height=H; c.className='pdet';
+    await page.render({canvasContext:c.getContext('2d'),viewport:v}).promise;
+    if(tok!==st.detTok||!box.isConnected) return; // a newer view is already on its way
+    Object.assign(c.style,{left:x0+'px',top:y0+'px',width:(x1-x0)+'px',height:(y1-y0)+'px'});
+    if(st.det) st.det.remove(); box.appendChild(c); st.det=c; st.detKey=key;
+  }catch(e){}
 }
 function pdfPage(it,delta){
   const n=clamp((it.page||1)+delta,1,it.pages||1);
@@ -2163,7 +2192,7 @@ function movePinch(){
   const t=[...pointers.values()].filter(p=>p.type==='touch'); if(t.length<2) return;
   const [a,b]=t, d=Math.hypot(a.x-b.x,a.y-b.y), m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
   const r=vp.getBoundingClientRect(), v0=action.v0;
-  const nz=clamp(v0.z*d/action.d0,0.08,5);
+  const nz=clamp(v0.z*d/action.d0,ZMIN,ZMAX);
   const wx=(action.m0.x-r.left-v0.x)/v0.z, wy=(action.m0.y-r.top-v0.y)/v0.z;
   view.z=nz; view.x=m.x-r.left-wx*nz; view.y=m.y-r.top-wy*nz; applyView();
 }
@@ -2202,7 +2231,7 @@ function genGuide(kind,s,e,shift){
     return {pts:P,label:fmtVal(Math.abs(w))+' × '+fmtVal(Math.abs(h))+' '+scaleOf().unit};
   }
   // ellipse in the dragged box
-  const cx=s.x+w/2, cy=s.y+h/2, rx=Math.abs(w)/2, ry=Math.abs(h)/2, n=Math.max(48,Math.ceil(Math.PI*(rx+ry)/3));
+  const cx=s.x+w/2, cy=s.y+h/2, rx=Math.abs(w)/2, ry=Math.abs(h)/2, n=Math.max(48,Math.min(4000,Math.ceil(Math.PI*(rx+ry)*view.z/2)));
   for(let i=0;i<=n;i++){ const t=-Math.PI/2+i/n*Math.PI*2; add(cx+Math.cos(t)*rx,cy+Math.sin(t)*ry); }
   return {pts:P,label:(Math.abs(Math.abs(w)-Math.abs(h))<0.5?'Ø '+fmtVal(Math.abs(w)):'Ø '+fmtVal(Math.abs(w))+' × '+fmtVal(Math.abs(h)))+' '+scaleOf().unit};
 }
@@ -2666,7 +2695,7 @@ function renderRuler(){
     const x=i*stepPx-lo, m=((i%k)+k)%k, big=m===0, mid=!big&&k%2===0&&m===k/2;
     const len=(big?16:mid?11:6)/z;
     ticks+=`M${r2(x)} 0V${r2(len)}M${r2(x)} ${r2(W)}V${r2(W-len)}`;
-    if(big&&busy.every(b=>Math.abs(x-b)>24/z)&&(x<ux-22/z||x>ux+tw+22/z)) labels+=`<text class="rlab" x="${x}" y="${W/2}" font-size="${10/z}" text-anchor="middle" dominant-baseline="central">${(Math.round(Math.abs(i)*minor*1e6)/1e6).toLocaleString('de-DE',{maximumFractionDigits:3})}</text>`;
+    if(big&&busy.every(b=>Math.abs(x-b)>24/z)&&(x<ux-22/z||x>ux+tw+22/z)) labels+=`<text class="rlab" x="${x}" y="${W/2}" font-size="${10/z}" text-anchor="middle" dominant-baseline="central">${(Math.round(Math.abs(i)*minor*1e6)/1e6).toLocaleString('de-DE',{maximumFractionDigits:6})}</text>`;
   }
   rulerEl.innerHTML=`<svg width="${L}" height="${W}" viewBox="0 0 ${L} ${W}" overflow="visible" aria-hidden="true">
     <rect width="${L}" height="${W}" class="rbody" data-ruler="body"/>
@@ -3216,7 +3245,7 @@ function renderWheel(){
       const s=prefs.bset[k], gc=on?'#1A1407':(prefs.theme!=='paper'&&COLORS[s.color]&&COLORS[s.color].dark?UI.ink2:inkColor(s.color));
       glyph=brushGlyph(k,gx,gy,gc,on);
     }
-    const lab=k==='eraser'?Math.round(prefs.eraser):(prefs.bset[k].size<10?prefs.bset[k].size:Math.round(prefs.bset[k].size));
+    const lab=k==='eraser'?Math.round(prefs.eraser):fmtSize(prefs.bset[k].size);
     h+=`<g class="wseg${on?' on':''}${last?' last':''}" data-seg="${k}" role="button" aria-label="${k==='eraser'?'Radierer':BRUSHES[k].name}"><title>${k==='eraser'?'Radierer (E)':BRUSHES[k].name+' ('+(i+1)+') – nochmal antippen: andere Stiftart'}</title><path class="bg" d="${arcSeg(a0,a1,68,110)}"/>${glyph}<text class="wtxt" x="${tx}" y="${ty}" text-anchor="middle" dominant-baseline="central">${lab}</text></g>`;
   });
   // inner disc
@@ -3225,7 +3254,7 @@ function renderWheel(){
   const dot=clamp(size*0.9,3,21);
   h+=`<g class="wcenter" data-act="pick" role="button" aria-label="Farbe wählen"><title>Eigene Farbe wählen</title><circle r="24" class="wdot"/>${eras?`<circle r="${clamp(prefs.eraser/2,3,22)}" fill="none" stroke="${UI.ink2}" stroke-dasharray="3 3"/>`:`<circle r="${dot}" fill="${col}" opacity="${b.op/100}"/>`}</g>`;
   const sc=(key,x,y,val,cap,off)=>`<g class="scrub${off?' off':''}" data-scrub="${key}" role="slider" aria-label="${cap}" aria-valuetext="${val}"><title>${cap}: ziehen zum Ändern</title><rect class="hitbox" x="${x-28}" y="${y-13}" width="56" height="28" rx="6"/><text class="v" x="${x}" y="${y-2}" text-anchor="middle" dominant-baseline="central">${val}</text><text class="c" x="${x}" y="${y+10}" text-anchor="middle" dominant-baseline="central">${cap}</text></g>`;
-  h+=sc('size',0,-41,(size<10?Math.round(size*10)/10:Math.round(size))+' px','GRÖSSE',false);
+  h+=sc('size',0,-41,fmtSize(size)+' px','GRÖSSE',false);
   if(eras){
     h+=`<text class="wtxt" x="0" y="36" text-anchor="middle" dominant-baseline="central">RADIERER</text>`;
   }else{
@@ -3272,7 +3301,7 @@ wheelSvg.addEventListener('pointermove',e=>{
   if(!scrub||e.pointerId!==scrub.id) return;
   const d=(e.clientX-scrub.x)-(e.clientY-scrub.y);
   if(scrub.k==='size'){
-    let v=scrub.v0*Math.exp(d*0.012); v=clamp(v,scrub.eras?6:0.5,scrub.eras?160:80); v=v<10?Math.round(v*10)/10:Math.round(v);
+    let v=scrub.v0*Math.exp(d*0.012); v=scrub.eras?Math.round(clamp(v,6,160)):roundSize(v);
     if(scrub.eras) prefs.eraser=v; else B().size=v;
   }else{
     B()[scrub.k]=Math.round(clamp(scrub.v0+d*0.5,scrub.k==='op'?5:0,100));
@@ -3284,7 +3313,7 @@ wheelSvg.addEventListener('pointerup',endScrub); wheelSvg.addEventListener('poin
 wheelSvg.addEventListener('wheel',e=>{
   const sg=e.target.closest('[data-scrub]'); if(!sg) return; e.preventDefault();
   const k=sg.dataset.scrub, d=-e.deltaY;
-  if(k==='size'){ if(tool==='eraser') prefs.eraser=clamp(Math.round(prefs.eraser*Math.exp(d*0.004)),6,160); else { let v=B().size*Math.exp(d*0.004); B().size=v<10?Math.round(clamp(v,0.5,80)*10)/10:Math.round(clamp(v,0.5,80)); } }
+  if(k==='size'){ if(tool==='eraser') prefs.eraser=clamp(Math.round(prefs.eraser*Math.exp(d*0.004)),6,160); else { let v=B().size*Math.exp(d*0.004); B().size=roundSize(v); } }
   else B()[k]=Math.round(clamp(B()[k]+Math.sign(d)*5,k==='op'?5:0,100));
   savePrefs(); renderWheel(); renderPenOpts();
 },{passive:false});
@@ -3604,7 +3633,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='['||e.key===']'){
     const f=e.key===']'?1.15:1/1.15;
     if(tool==='eraser') prefs.eraser=clamp(Math.round(prefs.eraser*f),6,160);
-    else { let v=B().size*f; B().size=v<10?Math.round(clamp(v,0.5,80)*10)/10:Math.round(clamp(v,0.5,80)); }
+    else { let v=B().size*f; B().size=roundSize(v); }
     savePrefs(); renderWheel(); renderPenOpts(); return;
   }
   if(k==='g'){ cycleGrid(); return; }

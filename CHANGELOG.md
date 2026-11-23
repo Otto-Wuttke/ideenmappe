@@ -1,5 +1,15 @@
 # Änderungen
 
+## 1.0.6 Beta – 23. November 2026
+
+- Zoom bis 5000 % (bisher 500 %).
+- Das Raster teilt sich beim Hineinzoomen weiter auf, statt riesige Kästchen zu zeigen.
+- Pinselgröße ab 0,05 (bisher 0,5), damit man auch stark vergrößert fein zeichnen kann.
+- Strichpunkte werden passend zur Zoomstufe genau gespeichert; Ellipsen und Kreise bekommen genug Stützpunkte.
+- Der Fangbereich zum Antippen von Strichen, Verbindungen und Führungslinien bleibt bei jedem Zoom gleich groß auf dem Bildschirm (vorher wurde er beim Hineinzoomen riesig).
+- PDFs: Bei starkem Zoom wird der sichtbare Ausschnitt zusätzlich in voller Auflösung gerendert, die Seite bleibt scharf.
+- Lineal zeigt auch sehr feine Teilungen mit Nachkommastellen.
+
 ## 1.0.5 Beta – 20. November 2026
 
 - Führungslinien für Textboxen: Textbox auswählen, den Griff links daneben auf ein Objekt oder eine Stelle ziehen. Die Linie beginnt am Text mit einem kurzen waagrechten Ansatz und endet mit Punkt oder Pfeil (umschaltbar in der Leiste). Endet sie auf einem Objekt, wandert sie mit, wenn es verschoben oder vergrößert wird. Mehrere Linien pro Textbox; ein Ende zurück auf die Textbox ziehen entfernt die Linie. Auch im Export.
