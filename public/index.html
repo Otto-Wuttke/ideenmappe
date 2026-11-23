@@ -1239,8 +1239,7 @@ function fhOpts(o,last){
   const br=BRUSHES[o.brush];
   const sm=(o.sm??45)/100;
   // guided strokes (ruler, template, shapes) already lie exactly on their path: no streamline, it would pull curves inwards
-  // no streamline: it lags behind the pen and bridges the gap with a straight piece; strokes are smoothed beforehand (steady)
-  const opts={size:o.size,thinning:br?br.thin:(o.pen?0.6:0.5),smoothing:0.5,streamline:0,simulatePressure:!o.pen,last};
+  const opts={size:o.size,thinning:br?br.thin:(o.pen?0.6:0.5),smoothing:0.5,streamline:o.geo?0:0.15+0.75*sm,simulatePressure:!o.pen,last};
   if(br&&br.taper&&!o.geo&&!o.cut){ opts.start={taper:o.size*br.taper/10,cap:true}; opts.end={taper:o.size*br.taper/10,cap:true}; }
   return opts;
 }
@@ -1251,27 +1250,10 @@ function smoothPts(P,sm){ // light moving average for technical lines; keeps the
   const k=Math.round((sm??50)/30); if(k<1||P.length<4) return P;
   return P.map((p,i)=>{ if(i===0||i===P.length-1) return p; let x=0,y=0,n=0; for(let j=Math.max(0,i-k);j<=Math.min(P.length-1,i+k);j++){ x+=P[j][0]; y+=P[j][1]; n++; } return [x/n,y/n,p[2]]; });
 }
-// Smoothing of freehand strokes: a weighted average over neighbouring points on both sides. Towards the ends the
-// window shrinks to nothing, so the stroke always ends exactly at the pen – no lag and no straight bridging piece –
-// and while drawing, the part behind the pen settles smoothly. Preview and finished stroke use the same smoothing.
-function steady(P,sm,z){
-  // the smoothing reaches over a distance on screen (up to ~8 px at 100 %), measured when the stroke was drawn
-  const n=P.length, sig=(0.5+clamp(sm??45,0,100)/100*7.5)/(z||1); if(n<3||sig*(z||1)<0.6) return P;
-  const cum=[0]; for(let i=1;i<n;i++) cum[i]=cum[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
-  const end=cum[n-1], out=new Array(n);
-  for(let i=0;i<n;i++){
-    const h=Math.min(2.5*sig,cum[i],end-cum[i]); if(h<=1e-9){ out[i]=P[i]; continue; }
-    let x=0,y=0,pr=0,t=0;
-    for(let j=i;j>=0&&cum[i]-cum[j]<=h;j--){ const d=(cum[i]-cum[j])/sig, g=Math.exp(-d*d/2); x+=P[j][0]*g; y+=P[j][1]*g; pr+=(P[j][2]??.5)*g; t+=g; }
-    for(let j=i+1;j<n&&cum[j]-cum[i]<=h;j++){ const d=(cum[j]-cum[i])/sig, g=Math.exp(-d*d/2); x+=P[j][0]*g; y+=P[j][1]*g; pr+=(P[j][2]??.5)*g; t+=g; }
-    out[i]=[x/t,y/t,pr/t];
-  }
-  return out;
-}
 const r2=n=>Math.round(n*100)/100;
 // A stroke is drawn as a list of parts: {d, fill} or {d, w, cap, dash} (+ op, clip)
 function strokeParts(it){
-  const br=BRUSHES[it.brush]||{}, st=br.style||'solid', s=it.size, P=it.geo?it.pts:steady(it.pts,it.sm,it.zs), R=seedRand(it.seed??it.id??1);
+  const br=BRUSHES[it.brush]||{}, st=br.style||'solid', s=it.size, P=it.pts, R=seedRand(it.seed??it.id??1);
   const outline=(Q,size,extra)=>freehand?{d:outlineD(freehand(Q,Object.assign(fhOpts({...it,size},true),extra||{}))),fill:true}:{d:polyD(Q),w:size,cap:'round'};
   const parts=[];
   if(st==='solid') parts.push(outline(P,s));
@@ -1319,7 +1301,7 @@ function strokeParts(it){
   }
   else if(st==='nib'){
     // broad nib held at 45°: thick or thin depending on the direction of the stroke
-    const Q=P, a=-Math.PI/4, nx=Math.cos(a)*s/2, ny=Math.sin(a)*s/2;
+    const Q=smoothPts(P,it.sm), a=-Math.PI/4, nx=Math.cos(a)*s/2, ny=Math.sin(a)*s/2;
     const k=p=>it.pen?0.45+0.55*(p[2]??.5)*1.6:1;
     if(Q.length===1){ const p=Q[0]; parts.push({d:`M${r2(p[0]+nx)} ${r2(p[1]+ny)}L${r2(p[0]-nx)} ${r2(p[1]-ny)}`,w:Math.max(1,s*0.18),cap:'round'}); }
     else{
@@ -1362,7 +1344,7 @@ function strokeParts(it){
   }
   else if(st==='dash'||st==='dashdot'){
     // technical lines: hidden edges (dashed) and centre lines (dash-dot)
-    const Q=P, w=Math.max(0.6,s);
+    const Q=it.geo?P:smoothPts(P,it.sm), w=Math.max(0.6,s);
     const dash=st==='dash'?[w*4+3,w*2.5+2]:[w*7+6,w*2+2,Math.max(w*0.8,1),w*2+2];
     parts.push({d:polyD(Q),w,cap:'butt',dash:dash.map(r2)});
   }
@@ -2294,7 +2276,7 @@ function strokeOpts(a){ const b=B(); return {size:b.size,pen:a.pen||a.geo,brush:
 function clearTmp(){ tmpInk.innerHTML=''; }
 function drawTmp(a=action){
   const b=B(), col=inkColor(b.color);
-  const fake={pts:a.pts,size:b.size,pen:!!(a.pen||a.geo),brush:prefs.brush,sm:b.sm,geo:!!a.geo,seed:a.seed||7,zs:view.z};
+  const fake={pts:a.pts,size:b.size,pen:!!(a.pen||a.geo),brush:prefs.brush,sm:b.sm,geo:!!a.geo,seed:a.seed||7};
   tmpInk.setAttribute('opacity',b.op/100);
   tmpInk.innerHTML=partsSVG(strokeParts(fake),col,'tmp');
 }
@@ -2311,7 +2293,7 @@ function startDraw(base,e,w){
   a.hold={x:e.clientX,y:e.clientY};
   action=a;
   if(a.kind==='free') a.holdT=setTimeout(()=>straighten(a),550);
-  else drawTmp(); // a free stroke shows up once the pen moves
+  drawTmp();
 }
 function moveDraw(e,w){
   const a=action;
@@ -2335,11 +2317,6 @@ function moveDraw(e,w){
     a.pts=g.pts; drawTmp(); showMeasure(g.label,e.clientX,e.clientY); return;
   }
   const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
-  if(!a.going){ // still on the spot where the pen came down: no growing dot – just remember how hard it presses
-    if(a.pen) a.pts[0][2]=Math.max(a.pts[0][2],e.pressure||.5);
-    if(Math.hypot(e.clientX-a.sx,e.clientY-a.sy)<2.5) return;
-    a.going=true;
-  }
   for(const ev of evs){const q=toWorld(ev.clientX,ev.clientY);a.pts.push([q.x,q.y,a.pen?ev.pressure||.5:.5]);}
   drawTmp();
   // hold still for a moment at the end of a stroke = straighten it (like on the iPad)
@@ -2371,7 +2348,7 @@ function finishStroke(a){
   const minD=0.6/view.z, out=[pts[0]];
   for(let i=1;i<pts.length;i++){const p=pts[i],q=out[out.length-1];if(Math.hypot(p[0]-q[0],p[1]-q[1])>=minD||i===pts.length-1) out.push(p);}
   const b=B();
-  const it=mkInk(out,b.color,b.size); it.pen=a.pen||!!a.geo; it.brush=prefs.brush; it.op=b.op; it.sm=b.sm; it.seed=a.seed; if(a.geo) it.geo=true; else it.zs=Math.round(view.z*1000)/1000; // zoom while drawn: scale of the smoothing
+  const it=mkInk(out,b.color,b.size); it.pen=a.pen||!!a.geo; it.brush=prefs.brush; it.op=b.op; it.sm=b.sm; it.seed=a.seed; if(a.geo) it.geo=true;
   attach(it);
   pushHistory(); items().push(it); markDirty(); render();
 }

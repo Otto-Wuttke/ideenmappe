@@ -9,8 +9,6 @@
 - Der Fangbereich zum Antippen von Strichen, Verbindungen und Führungslinien bleibt bei jedem Zoom gleich groß auf dem Bildschirm (vorher wurde er beim Hineinzoomen riesig).
 - PDFs: Bei starkem Zoom wird der sichtbare Ausschnitt zusätzlich in voller Auflösung gerendert, die Seite bleibt scharf.
 - Lineal zeigt auch sehr feine Teilungen mit Nachkommastellen.
-- Freihand-Striche: kein gerades Stück mehr zwischen Strich und Stiftspitze beim Zeichnen (und am Ende des fertigen Strichs). Die Glättung arbeitet jetzt nach beiden Seiten über eine Strecke auf dem Bildschirm (bis etwa 8 Bildpunkte bei 100 %) statt nachzulaufen; der Strich endet immer genau am Stift, Vorschau und fertiger Strich sehen gleich aus.
-- Kein wachsender Punkt mehr beim Aufsetzen des Stifts: Der Strich erscheint, sobald sich der Stift bewegt, gleich in der Stärke des Aufsetzdrucks. Ein Tipp ohne Bewegung ergibt weiterhin einen Punkt.
 - Bei starkem Zoom bewegen sich Lineal, Bogenlehre, Objekte, Auswahlrahmen und Fluchtpunkte flüssig. Vorher sprangen sie in Safari (iPad) in großen Schritten, weil die Position auf ganze Zeichnungspixel gerundet wurde; sie wird jetzt per Transform gesetzt.
 - Fasspunkte von Lineal und Bogenlehre lassen sich bei jeder Zoomstufe sicher greifen: Jeder hat eine unsichtbare Greiffläche von 44 Bildpunkten direkt auf dem Bildschirm (vorher wurden sie bei starkem Zoom im Browser manchmal nicht mehr getroffen).
 - Zahlen auf Lineal, Bogenlehre, Zoom- und Maßstabsanzeige, Werkzeugrad und Maßangaben in IBM Plex Sans mit gleich breiten Ziffern statt Plex Mono: Die 0 hat keinen Punkt mehr und ist auch klein nicht mit der 8 zu verwechseln.
