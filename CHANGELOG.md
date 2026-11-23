@@ -9,6 +9,7 @@
 - Der Fangbereich zum Antippen von Strichen, Verbindungen und Führungslinien bleibt bei jedem Zoom gleich groß auf dem Bildschirm (vorher wurde er beim Hineinzoomen riesig).
 - PDFs: Bei starkem Zoom wird der sichtbare Ausschnitt zusätzlich in voller Auflösung gerendert, die Seite bleibt scharf.
 - Lineal zeigt auch sehr feine Teilungen mit Nachkommastellen.
+- Zahlen auf Lineal, Bogenlehre, Zoom- und Maßstabsanzeige, Werkzeugrad und Maßangaben in IBM Plex Sans mit gleich breiten Ziffern statt Plex Mono: Die 0 hat keinen Punkt mehr und ist auch klein nicht mit der 8 zu verwechseln.
 
 ## 1.0.5 Beta – 20. November 2026
 
