@@ -3,6 +3,8 @@
 ## 1.0.6 Beta – 23. November 2026
 
 - Textboxen: Schriftgröße wie in einer Textverarbeitung – Zahlenfeld zum Eintippen (mit Liste üblicher Größen, Pfeiltasten), A− / A+ springen zur nächsten Größe; dazu ein eigener Fett-Schalter. Bisherige Boxen behalten ihr Aussehen.
+- Werkzeugrad: Beschriftungen „Größe“, „Glättung“, „Deckkraft“ kleiner und in normaler Schreibweise statt Großbuchstaben.
+- Farbfächer: keine Trennlinien mehr zwischen den Farbkacheln.
 - Führungslinien: Linienende wählbar – Punkt am Objekt, Pfeil am Objekt, Pfeil am Text oder Pfeile an beiden Enden (auch im Export).
 - Textboxen: Ausrichtung linksbündig, zentriert, rechtsbündig oder Blocksatz (auch im Export; die letzte Zeile eines Absatzes bleibt im Blocksatz linksbündig).
 - Zoom bis 5000 % (bisher 500 %).
