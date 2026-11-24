@@ -16,6 +16,7 @@ Ideenmappe: Skizzen- und Ideen-App im Stil von Concepts. Der Besitzer arbeitet v
 - Datenformat der Boards rückwärtskompatibel halten: neue Felder optional, alte Boards müssen weiter laden.
 - Jede Änderung an `public/index.html` auch in der Claude-Version veröffentlichen, wenn die Session das Artifact-Tool hat (Slug `df992f2c-f09c-4de0-8561-31774ed9526b`).
 - Neue Versionen in `CHANGELOG.md` eintragen, Version in `package.json` erhöhen.
+- Kleine Änderungen nur lokal committen und in der Claude-Version veröffentlichen. Nach GitHub pushen erst in größeren Abständen (mehrere Änderungen gesammelt) oder wenn der Besitzer es möchte.
 - Nichts aus `data/` oder `.env` committen.
 
 ## Testen

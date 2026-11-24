@@ -1,5 +1,59 @@
 # Änderungen
 
+## 1.0.7 Beta – 24. November 2026
+
+- Auswahlrahmen: dünne, kräftig graue Linie (bei jedem Zoom 1 Bildpunkt, auch bei 5000 %) mit Fasspunkten an allen vier Ecken; jede Ecke ändert die Größe (die gegenüberliegende bleibt stehen).
+- Drehen: Doppelt auf eine Ecke tippen (bei Skizzen auch doppelt auf den Strich) oder „↻ Drehen“ in der Leiste schaltet die Ecken zwischen Größe und Drehen um. Einrasten bei 15°-Schritten (Umschalttaste: immer), Winkelanzeige beim Drehen, „0°“ setzt zurück. Gilt für Skizzen, Texte, Notizen, Formen, Bilder und PDFs; Angeheftetes dreht mit, Verbindungen und Führungslinien folgen. Auch im Export.
+- Rückgängig/Wiederherstellen bleibt erhalten: nach dem Neuladen und auf anderen Geräten (Claude-Version und eigener Server; im Browser-Modus nur in diesem Browser). Bis zu 120 Schritte je Board, gespeichert als Unterschiede in einem eigenen Eintrag „<Board>__verlauf“, damit das Board selbst nicht größer wird. In der Claude-Version werden bei sehr großen Änderungen die ältesten Schritte weggelassen (Grenze rund 240 KB).
+- Mehrfachauswahl: gemeinsamer gestrichelter Rahmen mit vier Eckpunkten; die Auswahl lässt sich als Ganzes skalieren (Seitenverhältnis bleibt, Schriftgrößen wachsen mit) und um ihre Mitte drehen. Umschalten wie beim einzelnen Objekt: Ecke doppelt tippen oder „↻ Drehen“.
+
+## 1.0.6 Beta – 23. November 2026
+
+- Textboxen: Schriftgröße wie in einer Textverarbeitung – Zahlenfeld zum Eintippen (mit Liste üblicher Größen, Pfeiltasten), A− / A+ springen zur nächsten Größe; dazu ein eigener Fett-Schalter. Bisherige Boxen behalten ihr Aussehen.
+- Werkzeugrad: Beschriftungen „Größe“, „Glättung“, „Deckkraft“ kleiner und in normaler Schreibweise statt Großbuchstaben.
+- Farbfächer: keine Trennlinien mehr zwischen den Farbkacheln.
+- Führungslinien: Linienende wählbar – Punkt am Objekt, Pfeil am Objekt, Pfeil am Text oder Pfeile an beiden Enden (auch im Export).
+- Textboxen: Ausrichtung linksbündig, zentriert, rechtsbündig oder Blocksatz (auch im Export; die letzte Zeile eines Absatzes bleibt im Blocksatz linksbündig).
+- Zoom bis 5000 % (bisher 500 %).
+- Das Raster teilt sich beim Hineinzoomen weiter auf, statt riesige Kästchen zu zeigen.
+- Pinselgröße ab 0,05 (bisher 0,5), damit man auch stark vergrößert fein zeichnen kann.
+- Strichpunkte werden passend zur Zoomstufe genau gespeichert; Ellipsen und Kreise bekommen genug Stützpunkte.
+- Der Fangbereich zum Antippen von Strichen, Verbindungen und Führungslinien bleibt bei jedem Zoom gleich groß auf dem Bildschirm (vorher wurde er beim Hineinzoomen riesig).
+- PDFs: Bei starkem Zoom wird der sichtbare Ausschnitt zusätzlich in voller Auflösung gerendert, die Seite bleibt scharf.
+- Lineal zeigt auch sehr feine Teilungen mit Nachkommastellen.
+- Bei starkem Zoom bewegen sich Lineal, Bogenlehre, Objekte, Auswahlrahmen und Fluchtpunkte flüssig. Vorher sprangen sie in Safari (iPad) in großen Schritten, weil die Position auf ganze Zeichnungspixel gerundet wurde; sie wird jetzt per Transform gesetzt.
+- Fasspunkte von Lineal und Bogenlehre lassen sich bei jeder Zoomstufe sicher greifen: Jeder hat eine unsichtbare Greiffläche von 44 Bildpunkten direkt auf dem Bildschirm (vorher wurden sie bei starkem Zoom im Browser manchmal nicht mehr getroffen).
+- Zahlen auf Lineal, Bogenlehre, Zoom- und Maßstabsanzeige, Werkzeugrad und Maßangaben in IBM Plex Sans mit gleich breiten Ziffern statt Plex Mono: Die 0 hat keinen Punkt mehr und ist auch klein nicht mit der 8 zu verwechseln.
+
+## 1.0.5 Beta – 20. November 2026
+
+- Führungslinien für Textboxen: Textbox auswählen, den Griff links daneben auf ein Objekt oder eine Stelle ziehen. Die Linie beginnt am Text mit einem kurzen waagrechten Ansatz und endet mit Punkt oder Pfeil (umschaltbar in der Leiste). Endet sie auf einem Objekt, wandert sie mit, wenn es verschoben oder vergrößert wird. Mehrere Linien pro Textbox; ein Ende zurück auf die Textbox ziehen entfernt die Linie. Auch im Export.
+- Dunkelmodus: Alle Farben werden hell dargestellt, auch die aus dem Farbfächer (Helligkeit umgekehrt, Farbton bleibt): Schwarz auf Papier ist im Dunkelmodus hell. Gespeichert wird immer die Papierfarbe.
+- Export (PNG, JPG, PDF) sieht immer aus wie auf Papier, auch wenn er im Dunkelmodus erstellt wird. Hintergrund standardmäßig reinweiß wie eine Druckseite; wahlweise Papierton oder (PNG) transparent.
+- Skizzen und Notizen auf PDF-Seiten und Bildern behalten im Dunkelmodus ihre Papierfarben, weil die Seite darunter hell bleibt.
+- Textboxen: Der Cursor ist beim Bearbeiten gut sichtbar (kräftiges Blau statt Akzentfarbe), auch in Safari und Firefox, und steht gleich am Textende.
+- Kopien herausziehen: Mit gedrückter Strg-Taste (Mac: ⌘ oder ⌥) ein Objekt oder eine Auswahl ziehen erzeugt eine Kopie, das Original bleibt liegen. An Bildern und PDF-Seiten angeheftete Skizzen und Verbindungen innerhalb der Auswahl kommen mit. Ein Klick ohne Ziehen erzeugt keine Kopie; Rückgängig entfernt die Kopie in einem Schritt.
+
+## 1.0.4 Beta – 18. November 2026
+
+- Lineal wie in Concepts: endlos, es geht bei jeder Zoomstufe durch den ganzen Bildschirm. Die Drehpunkte haben einen festen Abstand zum Verschiebepunkt und sind so immer bedienbar. Die Teilung wird je nach Zoom feiner oder gröber; die Zahlen zählen vom Verschiebepunkt aus.
+- Drehen läuft gleichmäßiger: kein Sprung mehr beim Greifen eines Drehpunkts, sanfteres Einrasten bei 15°-Schritten (Umschalttaste rastet immer ein), die Gradanzeige zeigt Zehntelgrad.
+- Bogenlehre: bleibt beim Hinein- und Herauszoomen gleich groß auf dem Bildschirm, wie das Lineal. Das angezeigte Maß passt sich dem Zoom an.
+- Striche an Bogenlehre, Lineal und Formen liegen exakt auf ihrer Bahn: keine Nachlauf-Glättung mehr bei geführten Strichen, Bögen mit Stützpunkten alle 1,5 Bildpunkte, beim Hineinzoomen werden Strichpunkte feiner gespeichert.
+- Handballen verschiebt Bogenlehre und Lineal nicht mehr: Ein Finger auf dem Ring der Lehre oder auf dem Lineal wird in den 2 Sekunden nach dem Stift ignoriert, und mit dem Finger verschoben wird erst ab einer deutlichen Bewegung (12 Bildpunkte). Verschiebe- und Drehpunkte reagieren wie bisher sofort.
+- Liegt der Verschiebepunkt außerhalb des Bildes oder unter Werkzeugrad, Werkzeugleiste oder Kopfzeile, rückt er in den freien Bereich.
+- Die Teilungsstriche von Lineal und Bogenlehre sowie die Linien des Perspektivrasters bleiben bei jeder Zoomstufe gleich fein. Bisher wurden sie in Safari und Chrome beim Hineinzoomen dicker.
+
+## 1.0.3 Beta – 18. November 2026
+
+- Aquarell wirkt jetzt wässrig: ausgefranste Ränder, Papierkörnung, ungleichmäßig verteiltes Pigment und ein leicht dunklerer Trocknungsrand nur außen. Zum Strichende hin reißt die Farbe wie bei einem trockenen Pinsel in Borstenspuren auf. Wo der Pinsel über sich selbst geht, entstehen keine Spuren quer durch die Fläche.
+- Aquarell-Striche haben stumpfe statt spitzer Enden.
+- Der Export zeigt Aquarell genauso wie die Fläche.
+
+## 1.0.2 Beta – 18. November 2026
+
+- Aquarell: keine Linien mehr in der Farbfläche, wenn der Pinsel über sich selbst geht. Die Kontur fällt weg, der Strich besteht nur noch aus versetzten, transparenten Farbschichten. Bestehende Aquarell-Striche werden automatisch neu dargestellt.
+
 ## 1.0.1 Beta – 17. November 2026
 
 **Keine Verbindungen zu fremden Servern mehr**
