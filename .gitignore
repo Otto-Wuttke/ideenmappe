@@ -7,3 +7,4 @@ session.key
 node_modules/
 *.log
 .DS_Store
+docker-compose.override.yml
