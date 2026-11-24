@@ -2,6 +2,7 @@
 
 ## Unveröffentlicht
 
+- Grundfarbe Petrol statt Gelb (aktive Knöpfe, Werkzeugrad, Lineal- und Lehrengriffe, Verbindungsgriffe, Auswahl). Im Papier-Design etwas dunkler für besseren Kontrast. Die Stiftfarbe „Bernstein“ bleibt.
 - Lizenz: GNU GPL v3 oder später (`LICENSE`). Repository öffentlich nutzbar, Installation ohne Deploy Key.
 - README: Einrichtung hinter einem vorhandenen Nginx Proxy Manager.
 
