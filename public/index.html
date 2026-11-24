@@ -159,7 +159,8 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .handle.corner[data-c=nw],.handle.corner[data-c=se]{cursor:nwse-resize}
 .handle.corner[data-c=ne],.handle.corner[data-c=sw]{cursor:nesw-resize}
 .handle.rot{border-radius:50%;border-color:var(--sel);background:var(--bg);cursor:grab;display:grid;place-items:center}
-.handle.rot svg{width:72%;height:72%;color:var(--sel);pointer-events:none}
+.handle.rot svg:not(.frm){width:72%;height:72%;color:var(--sel);pointer-events:none}
+#overlay svg.frm{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .handle{position:absolute;background:var(--bg);border-style:solid;border-color:var(--accent);pointer-events:auto;touch-action:none}
 .handle.resize{cursor:nwse-resize}
 .handle.link{border-radius:50%;cursor:crosshair;background:var(--accent)}
@@ -1643,6 +1644,15 @@ function renderOverlay(){
     }
   }
   overlay.innerHTML=txPos(h);
+  // Outlines as SVG strokes: browsers round CSS borders up to a whole pixel *before* the zoom is applied, so far
+  // zoomed in a hairline border turned into a thick bar. An SVG stroke stays exactly 1 px on screen.
+  overlay.querySelectorAll('.selbox,.handle.corner,.handle.rot,.handle.lead').forEach(el=>{
+    const w=parseFloat(el.style.width)||1, hh=parseFloat(el.style.height)||1, round=!el.classList.contains('selbox')&&!el.classList.contains('corner');
+    const r=round?Math.min(w,hh)/2:(el.classList.contains('selbox')?3/z:2/z);
+    el.style.borderWidth='0';
+    el.insertAdjacentHTML('afterbegin',`<svg class="frm" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" aria-hidden="true"><rect x="${bw/2}" y="${bw/2}" width="${Math.max(0,w-bw)}" height="${Math.max(0,hh-bw)}" rx="${Math.max(0,r-bw/2)}" fill="none" stroke="var(${el.classList.contains('lead')?'--accent':'--sel'})" stroke-width="${bw}"/></svg>`);
+  });
+  overlay.querySelectorAll('.handle.link,.handle.leadend').forEach(el=>el.style.borderWidth='0');
 }
 
 /* ---------- breadcrumbs ---------- */
