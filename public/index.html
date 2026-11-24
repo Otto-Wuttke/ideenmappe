@@ -156,6 +156,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 
 .selbox{position:absolute;border-style:solid;border-color:var(--sel);pointer-events:none;transform-origin:50% 50%}
 .handle.corner{border-color:var(--sel);background:var(--bg)}
+.selbox.gsel{border-style:dashed}
 .handle.corner[data-c=nw],.handle.corner[data-c=se]{cursor:nwse-resize}
 .handle.corner[data-c=ne],.handle.corner[data-c=sw]{cursor:nesw-resize}
 .handle.rot{border-radius:50%;border-color:var(--sel);background:var(--bg);cursor:grab;display:grid;place-items:center}
@@ -1598,7 +1599,20 @@ function turnKid(k,c,da){ // things pinned to a turning image or PDF turn with i
   else { const q=rotPt(k.x+(k.w||0)/2,k.y+(k.h||0)/2,c.x,c.y,da); i.x=q.x-(i.w||0)/2; i.y=q.y-(i.h||0)/2; const r=k.rot+da; if(Math.abs(r)<1e-9) delete i.rot; else i.rot=r; }
   relFromAbs(i); // the host has its new angle already: store the place in its own frame
 }
+// several objects selected: the group gets one frame; things pinned to a selected image/PDF follow their host
+function groupItems(){
+  const s=selItems().filter(i=>i.type!=='link'&&geo(i)), ids=new Set(s.map(i=>i.id));
+  return s.filter(i=>!(i.att&&ids.has(i.att)));
+}
+function groupBox(list){
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const i of list){ const b=bbox(i); if(!b) continue; x0=Math.min(x0,b.x); y0=Math.min(y0,b.y); x1=Math.max(x1,b.x+b.w); y1=Math.max(y1,b.y+b.h); }
+  return x0<x1?{x:x0,y:y0,w:x1-x0,h:y1-y0}:null;
+}
+const selKey=()=>[...sel].sort().join(',');
+function snapOf(i){ return {i,x:i.x,y:i.y,w:i.w,h:i.h,rot:i.rot||0,fs:i.fs,ow:i.ow,oh:i.oh,pts:i.pts,ink:i.type==='ink'?{x:i.x,y:i.y,w:i.w,h:i.h,ow:i.ow,oh:i.oh,pts:i.pts}:null,leads:i.leads?i.leads.map(L=>({...L})):null}; }
 function toggleXform(force){
+  if(sel.size>1){ xform.id=selKey(); xform.mode=force||(xform.mode==='rotate'?'scale':'rotate'); renderOverlay(); renderCtx(); return; }
   const it=selItems()[0]; if(!it||!ROTATABLE.has(it.type)) return;
   xform.id=it.id; xform.mode=force||(xform.mode==='rotate'?'scale':'rotate');
   renderOverlay(); renderCtx();
@@ -1613,7 +1627,21 @@ function renderOverlay(){
     const pad=3/z;
     h+=`<div class="selbox" style="left:0;top:0;width:${b.w+pad*2}px;height:${b.h+pad*2}px;border-width:${bw}px;border-radius:${3/z}px;transform:translate(${b.x-pad}px,${b.y-pad}px)${it.rot?` rotate(${it.rot}rad)`:''}"></div>`;
   }
-  if(sel.size!==1) xform.id=null;
+  if(sel.size>1){
+    const g=groupItems(); let b=groupBox(g);
+    if(b&&g.length>1){
+      if(xform.id!==selKey()){ xform.id=selKey(); xform.mode='scale'; }
+      let ang=0; if(action&&action.type==='grotate'){ b=action.gb; ang=action.da||0; }
+      const hs=11/z, pad=6/z, c=ctrOf(b), rotMode=xform.mode==='rotate';
+      h+=`<div class="selbox gsel" style="left:0;top:0;width:${b.w+pad*2}px;height:${b.h+pad*2}px;transform:translate(${b.x-pad}px,${b.y-pad}px) rotate(${ang}rad)"></div>`;
+      [['nw',-1,-1],['ne',1,-1],['sw',-1,1],['se',1,1]].forEach(([k,sx,sy])=>{
+        const q=rotPt(c.x+sx*(b.w/2+pad),c.y+sy*(b.h/2+pad),c.x,c.y,ang);
+        if(rotMode){ const rs=18/z;
+          h+=`<div class="handle rot" data-handle="grot" data-c="${k}" title="Ziehen: Auswahl drehen – doppelt tippen: Größe" style="left:${q.x-rs/2}px;top:${q.y-rs/2}px;width:${rs}px;height:${rs}px;border-width:0;background:none"><svg class="rico" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8.5" fill="var(--bg)" stroke="var(--sel)" stroke-width="1"/><g transform="translate(2.5 2.5) scale(.8125)" fill="none" stroke="var(--sel)" stroke-width="1.6" stroke-linecap="round"><path d="M12.5 5.5A5 5 0 1 0 13 9"/><path d="M13 2.5v3h-3"/></g></svg></div>`;
+        } else h+=`<div class="handle resize corner" data-handle="gscale" data-c="${k}" title="Ziehen: Auswahl skalieren – doppelt tippen: drehen" style="left:${q.x-hs/2}px;top:${q.y-hs/2}px;width:${hs}px;height:${hs}px;border-width:${bw}px;border-radius:${2/z}px"></div>`;
+      });
+    }
+  }
   if(sel.size===1){
     const it=list.find(i=>sel.has(i.id)); const b=geo(it);
     if(xform.id!==it?.id){ xform.id=it?.id; xform.mode='scale'; }
@@ -1650,7 +1678,7 @@ function renderOverlay(){
     const w=parseFloat(el.style.width)||1, hh=parseFloat(el.style.height)||1, round=!el.classList.contains('selbox')&&!el.classList.contains('corner');
     const r=round?Math.min(w,hh)/2:(el.classList.contains('selbox')?3/z:2/z);
     el.style.borderWidth='0';
-    el.insertAdjacentHTML('afterbegin',`<svg class="frm" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" aria-hidden="true"><rect x="${bw/2}" y="${bw/2}" width="${Math.max(0,w-bw)}" height="${Math.max(0,hh-bw)}" rx="${Math.max(0,r-bw/2)}" fill="none" stroke="var(${el.classList.contains('lead')?'--accent':'--sel'})" stroke-width="${bw}"/></svg>`);
+    el.insertAdjacentHTML('afterbegin',`<svg class="frm" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" aria-hidden="true"><rect x="${bw/2}" y="${bw/2}" width="${Math.max(0,w-bw)}" height="${Math.max(0,hh-bw)}" rx="${Math.max(0,r-bw/2)}" fill="none" stroke="var(${el.classList.contains('lead')?'--accent':'--sel'})" stroke-width="${bw}"${el.classList.contains("gsel")?` stroke-dasharray="${4/z} ${3/z}"`:''}/></svg>`);
   });
   overlay.querySelectorAll('.handle.link,.handle.leadend').forEach(el=>el.style.borderWidth='0');
 }
@@ -1741,6 +1769,10 @@ function renderCtx(){
     h+='<button class="tb" data-act="open">Öffnen</button><button class="tb" data-act="rename">Umbenennen</button><div class="vsep"></div>';
   }
   if(s.length===1&&['text','note','shape'].includes(s[0].type)) h+='<button class="tb" data-act="edit">Bearbeiten</button>';
+  if(s.length>1&&groupItems().length>1){
+    const on=xform.id===selKey()&&xform.mode==='rotate';
+    h+=`<button class="tb" data-act="xform" aria-pressed="${on}" title="Ecken der Auswahl zum Drehen umschalten (oder Ecke doppelt tippen)">↻ Drehen</button><div class="vsep"></div>`;
+  }
   if(s.length===1&&ROTATABLE.has(s[0].type)){
     const on=xform.id===s[0].id&&xform.mode==='rotate';
     h+=`<button class="tb" data-act="xform" aria-pressed="${on}" title="Ecken zum Drehen umschalten (oder Ecke doppelt tippen)">↻ Drehen</button>`;
@@ -2136,6 +2168,15 @@ vp.addEventListener('pointerdown',e=>{
   if(lt&&(lt.dataset.lehre!=='body'||e.pointerType==='touch')){ action=lehreAction(lt.dataset.lehre==='body'?'move':lt.dataset.lehre,base); if(lt.dataset.lehre==='body') action.slop=true; return; }
   if(tool==='pen'||(e.pointerType==='pen'&&prefs.penDraws&&tool==='select')){ startDraw(base,e,w); return; }
   if(tool==='eraser'){ action={...base,type:'erase',hist:false}; eraseAt(w); return; }
+  if((handle==='gscale'||handle==='grot')&&sel.size>1){
+    const now=performance.now();
+    if(lastCorner&&now-lastCorner<380){ lastCorner=0; toggleXform(); return; }
+    lastCorner=now;
+    const g=groupItems(), gb=groupBox(g); if(!gb) return;
+    const ids=new Set(g.map(i=>i.id)), kids=items().filter(i=>i.att&&ids.has(i.att)&&!sel.has(i.id)).map(snapOf);
+    action={...base,type:handle==='grot'?'grotate':'gscale',gb,c:t.dataset.c||'se',snaps:g.map(snapOf),kids,hist:false};
+    return;
+  }
   if((handle==='resize'||handle==='rot')&&sel.size===1){
     const s=selItems()[0], now=performance.now();
     if(lastCorner&&now-lastCorner<380&&ROTATABLE.has(s.type)){ lastCorner=0; toggleXform(); return; }
@@ -2213,6 +2254,41 @@ vp.addEventListener('pointermove',e=>{
       if(it.type==='ink'&&it.att) relFromAbs(it);
       render(); break;
     }
+    case 'gscale':{
+      if(!action.hist){pushHistory();action.hist=true;}
+      const A0=action, gb=A0.gb, k=A0.c, sx=k.includes('e')?1:-1, sy=k.includes('s')?1:-1;
+      const A={x:sx>0?gb.x:gb.x+gb.w,y:sy>0?gb.y:gb.y+gb.h}, K={x:sx>0?gb.x+gb.w:gb.x,y:sy>0?gb.y+gb.h:gb.y};
+      const P={x:K.x+(w.x-A0.w0.x),y:K.y+(w.y-A0.w0.y)}, dx=sx*(P.x-A.x), dy=sy*(P.y-A.y);
+      const kk=Math.max(0.02,(dx*gb.w+dy*gb.h)/(gb.w*gb.w+gb.h*gb.h)); // same factor both ways
+      for(const S of A0.snaps){
+        const i=S.i, c={x:S.x+S.w/2,y:S.y+(S.h||0)/2}, nc={x:A.x+(c.x-A.x)*kk,y:A.y+(c.y-A.y)*kk};
+        i.w=S.w*kk; if(i.type!=='text'&&i.type!=='note') i.h=S.h*kk;
+        if(i.type==='text'&&S.fs!==undefined||i.type==='text') i.fs=Math.round((S.fs||18)*kk*10)/10;
+        i.x=nc.x-i.w/2; i.y=nc.y-(i.type==='text'||i.type==='note'?S.h:i.h)/2;
+        if(S.leads) i.leads.forEach((L,n)=>{ if(!L.to){ L.x=A.x+(S.leads[n].x-A.x)*kk; L.y=A.y+(S.leads[n].y-A.y)*kk; } });
+        if(i.att) relFromAbs(i);
+      }
+      render(); break;
+    }
+    case 'grotate':{
+      if(!action.hist){pushHistory();action.hist=true;}
+      const A0=action, G=ctrOf(A0.gb);
+      let da=Math.atan2(w.y-G.y,w.x-G.x)-Math.atan2(A0.w0.y-G.y,A0.w0.x-G.x);
+      const st=Math.PI/12, sa=Math.round(da/st)*st, snapped=e.shiftKey||Math.abs(sa-da)<0.035; if(snapped) da=sa;
+      A0.da=da;
+      for(const S of A0.snaps){
+        const i=S.i;
+        if(i.type==='ink'){ turnInk(i,S.ink,G.x,G.y,da); }
+        else { const q=rotPt(S.x+S.w/2,S.y+(S.h||0)/2,G.x,G.y,da); i.x=q.x-S.w/2; i.y=q.y-(S.h||0)/2;
+          if(ROTATABLE.has(i.type)){ const r=S.rot+da; if(Math.abs(r)<1e-9) delete i.rot; else i.rot=r; } }
+        if(S.leads) i.leads.forEach((L,n)=>{ if(!L.to){ const q=rotPt(S.leads[n].x,S.leads[n].y,G.x,G.y,da); L.x=q.x; L.y=q.y; } });
+        if(i.att) relFromAbs(i);
+      }
+      for(const k of A0.kids) turnKid(k,G,da);
+      let deg=((da*180/Math.PI)%360+360)%360; if(deg>359.95) deg=0;
+      showMeasure((snapped?Math.round(deg):Math.round(deg*10)/10).toLocaleString('de-DE')+'°',e.clientX,e.clientY);
+      render(); break;
+    }
     case 'rotate':{
       if(!action.hist){pushHistory();action.hist=true;}
       const A=action, c=A.c;
@@ -2278,6 +2354,7 @@ function endPointer(e,cancelled){
       break;
     case 'resize': if(a.it.type==='ink') attach(a.it); if(a.hist) markDirty(); render(); break;
     case 'rotate': showMeasure(''); if(a.hist) markDirty(); render(); break;
+    case 'grotate': case 'gscale': showMeasure(''); action=null; if(a.hist) markDirty(); render(); break;
     case 'erase': if(a.hist) markDirty(); break;
     case 'vpMove': markDirty(); break;
     case 'marquee':

@@ -5,6 +5,7 @@
 - Textboxen: Schriftgröße wie in einer Textverarbeitung – Zahlenfeld zum Eintippen (mit Liste üblicher Größen, Pfeiltasten), A− / A+ springen zur nächsten Größe; dazu ein eigener Fett-Schalter. Bisherige Boxen behalten ihr Aussehen.
 - Auswahlrahmen: dünne, kräftig graue Linie (bei jedem Zoom 1 Bildpunkt, auch bei 5000 %) mit Fasspunkten an allen vier Ecken; jede Ecke ändert die Größe (die gegenüberliegende bleibt stehen).
 - Drehen: Doppelt auf eine Ecke tippen (bei Skizzen auch doppelt auf den Strich) oder „↻ Drehen“ in der Leiste schaltet die Ecken zwischen Größe und Drehen um. Einrasten bei 15°-Schritten (Umschalttaste: immer), Winkelanzeige beim Drehen, „0°“ setzt zurück. Gilt für Skizzen, Texte, Notizen, Formen, Bilder und PDFs; Angeheftetes dreht mit, Verbindungen und Führungslinien folgen. Auch im Export.
+- Mehrfachauswahl: gemeinsamer gestrichelter Rahmen mit vier Eckpunkten; die Auswahl lässt sich als Ganzes skalieren (Seitenverhältnis bleibt, Schriftgrößen wachsen mit) und um ihre Mitte drehen. Umschalten wie beim einzelnen Objekt: Ecke doppelt tippen oder „↻ Drehen“.
 - Werkzeugrad: Beschriftungen „Größe“, „Glättung“, „Deckkraft“ kleiner und in normaler Schreibweise statt Großbuchstaben.
 - Farbfächer: keine Trennlinien mehr zwischen den Farbkacheln.
 - Führungslinien: Linienende wählbar – Punkt am Objekt, Pfeil am Objekt, Pfeil am Text oder Pfeile an beiden Enden (auch im Export).
