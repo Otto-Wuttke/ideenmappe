@@ -26,7 +26,8 @@
   --rule:#30333A;
   --text:#E9E6DF;
   --muted:#8A8E97;
-  --accent:#F2B544;
+  --accent:#14A3A3; /* petrol */
+  --accent-soft:rgba(20,163,163,.10);
   --dot:#2B2E35;
   --font-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -50,6 +51,8 @@
 }
 /* paper look: warm white sheet, light blue grid, dark ink */
 :root[data-ui="paper"]{
+  --accent:#0F8C8C; /* petrol, a touch deeper for contrast on paper */
+  --accent-soft:rgba(15,140,140,.10);
   --caret:#0A5FD0;
   --sel:#5C6068;
   --bg:#F7F5F0;
@@ -171,7 +174,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .handle.lead::after{content:'';position:absolute;inset:25%;border-radius:50%;background:var(--accent)}
 .handle.leadend{border-radius:50%;cursor:move;background:var(--accent);opacity:.9}
 .dims{position:absolute;font-family:var(--font-num);font-variant-numeric:tabular-nums;color:var(--bg);background:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
-#marquee{position:fixed;border:1px solid var(--accent);background:rgba(242,181,68,.08);pointer-events:none;display:none;z-index:5}
+#marquee{position:fixed;border:1px solid var(--accent);background:var(--accent-soft);pointer-events:none;display:none;z-index:5}
 
 /* Dock */
 #dock{position:fixed;left:50%;bottom:calc(14px + var(--sab));transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:4px;padding:5px;background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:0 12px 40px -12px rgba(0,0,0,.7);max-width:calc(100vw - 20px);overflow-x:auto;scrollbar-width:none}
@@ -284,9 +287,9 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .wseg{cursor:pointer}
 .wseg .bg{fill:var(--seg);stroke:var(--panel);stroke-width:2.5}
 .wseg:hover .bg{fill:var(--seg-hover)}
-.wseg.on .bg{fill:#F2B544}
+.wseg.on .bg{fill:var(--accent)}
 .wseg.on:hover .bg{fill:#F5C266}
-.wseg.last .bg{stroke:#F2B544;stroke-width:2.5}
+.wseg.last .bg{stroke:var(--accent);stroke-width:2.5}
 .wtxt{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:9px;fill:var(--muted);pointer-events:none}
 .wseg.on .wtxt{fill:#1A1407}
 .scrub{cursor:ns-resize}
@@ -355,7 +358,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #fanRing .fdisc{fill:var(--panel);opacity:.96;pointer-events:none;filter:drop-shadow(0 10px 30px rgba(0,0,0,.45))}
 #fanRing .cell{pointer-events:auto;cursor:pointer;stroke-width:.8}
 #fanRing .cell.on{stroke:#fff;stroke-width:3;paint-order:stroke}
-#fanRing .sel{fill:none;stroke:#F2B544;stroke-width:3;pointer-events:none}
+#fanRing .sel{fill:none;stroke:var(--accent);stroke-width:3;pointer-events:none}
 #fanRing text{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:8.6px;pointer-events:none}
 #fanRing.dragging .fbg,#fanRing.dragging .cell{cursor:grabbing}
 #wheel.fanning{background:transparent;border-color:transparent;box-shadow:none;z-index:24;pointer-events:none}
@@ -375,7 +378,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #lehre .llab{fill:var(--ink2);font-family:var(--font-num);font-variant-numeric:tabular-nums;pointer-events:none}
 #lehre .rticks{stroke:var(--ink2);stroke-width:calc(1px / var(--z,1));fill:none;pointer-events:none}
 #lehre .rlab{fill:var(--ink2);font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:500;pointer-events:none}
-#lehre .rgrip circle,#lehre .rknob circle{fill:#F2B544;pointer-events:auto;cursor:grab}
+#lehre .rgrip circle,#lehre .rknob circle{fill:var(--accent);pointer-events:auto;cursor:grab}
 #lehre .rgrip path,#lehre .rknob path{stroke:#1A1407;stroke-width:calc(1.6px / var(--z,1));fill:none;pointer-events:none}
 #ruler{position:absolute;transform-origin:50% 50%;pointer-events:none}
 #ruler svg{display:block}
@@ -385,7 +388,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 #ghits{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .ghit{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;pointer-events:auto;touch-action:none;cursor:grab}
 #ruler .rlab{fill:var(--ink2);font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:500;pointer-events:none}
-#ruler .rgrip circle,#ruler .rknob circle{fill:#F2B544;pointer-events:auto;cursor:grab}
+#ruler .rgrip circle,#ruler .rknob circle{fill:var(--accent);pointer-events:auto;cursor:grab}
 #ruler .rgrip path,#ruler .rknob path{stroke:#1A1407;stroke-width:calc(1.6px / var(--z,1));fill:none;pointer-events:none}
 #help{position:fixed;inset:0;z-index:35;display:none;place-items:center;background:var(--scrim)}
 #help.show{display:grid}
@@ -422,9 +425,9 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 <div id="viewport" class="t-select" tabindex="-1" aria-label="Arbeitsfläche">
   <div id="world">
     <svg id="persp" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
-    <svg id="links" xmlns="http://www.w3.org/2000/svg"><defs id="linkDefs"></defs><g id="linkItems"></g><path id="tmpLink" fill="none" stroke="#F2B544" stroke-width="1.75" stroke-dasharray="6 5"></path></svg>
+    <svg id="links" xmlns="http://www.w3.org/2000/svg"><defs id="linkDefs"></defs><g id="linkItems"></g><path id="tmpLink" fill="none" style="stroke:var(--accent)" stroke-width="1.75" stroke-dasharray="6 5"></path></svg>
     <div id="items"></div>
-    <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="leadItems"></g><path id="tmpLead" fill="none" stroke="#F2B544" stroke-width="1.5" stroke-dasharray="5 4"></path><g id="inkItems"></g><g id="tmpInk"></g></svg>
+    <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="leadItems"></g><path id="tmpLead" fill="none" style="stroke:var(--accent)" stroke-width="1.5" stroke-dasharray="5 4"></path><g id="inkItems"></g><g id="tmpInk"></g></svg>
     <div id="overlay"></div>
   </div>
   <div id="ghits"></div>
@@ -1497,7 +1500,7 @@ function renderInk(list){
   for(const [id,g] of inkEls) if(!seen.has(id)){ g.remove(); inkEls.delete(id); }
 }
 function initMarkers(){
-  const all={...Object.fromEntries(CKEYS.map(k=>[k,COLORS[k].line])),accent:'#F2B544'};
+  const all={...Object.fromEntries(CKEYS.map(k=>[k,COLORS[k].line])),accent:accentHex()};
   let h='';
   for(const k in all) h+=`<marker id="ah-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0.5 L10 5 L0 9.5 Z" fill="${all[k]}"/></marker>`;
   linkDefs.innerHTML=h;
@@ -1540,7 +1543,7 @@ function renderLinks(list){
     if(l.type!=='link') continue;
     const a=byId.get(l.from), b=byId.get(l.to); if(!a||!b) continue;
     const d=linkPath(a,b,l.style); if(!d) continue;
-    const s=sel.has(l.id), C=pal(l)[l.color]||pal(l).graphite, col=s?'#F2B544':C.line;
+    const s=sel.has(l.id), C=pal(l)[l.color]||pal(l).graphite, col=s?accentHex():C.line;
     h+=`<g data-id="${l.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="${s?2.25:1.75}" stroke-linejoin="round" marker-end="url(#ah-${s?'accent':(l.color||'graphite')})"/><path class="hit" d="${d}"/></g>`;
   }
   linkG.innerHTML=h;
@@ -1593,7 +1596,7 @@ function renderLeads(list){
   for(const it of list){
     if(it.type!=='text'||!it.leads||!it.leads.length||!inkVisible(it)) continue;
     const b=textBoxRect(it); if(!b) continue;
-    const P0=pal(it), col=sel.has(it.id)?'#F2B544':(P0[it.color]||P0.graphite).ink;
+    const P0=pal(it), col=sel.has(it.id)?accentHex():(P0[it.color]||P0.graphite).ink;
     for(const L of it.leads){
       const P=leadPts(it,L,byId,b), {Q,heads}=leadGeom(P,L.end);
       const d='M'+Q.map(p=>p[0]+' '+p[1]).join(' L'), dh='M'+P.map(p=>p[0]+' '+p[1]).join(' L');
@@ -2152,6 +2155,7 @@ async function addImage(file,wx,wy,quiet){
 
 /* ---------- pointer input ---------- */
 const pointers=new Map();
+function accentHex(){ return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#14A3A3'; }
 function isEditTarget(t){return t&&t.isContentEditable;}
 // text size: free number like in a word processor; bold: own setting, older boxes are bold from 26 px on
 const FS_LIST=[8,9,10,11,12,14,16,18,20,24,28,32,36,44,48,60,72,96,120,160];
@@ -3329,7 +3333,7 @@ async function drawDom0(g,it,s){
   }else if(it.type==='board'){
     const b=boards[it.boardId];
     rr(g,it.x,it.y,it.w,it.h,12); g.fillStyle=UI.panel; g.fill(); g.strokeStyle=UI.rule; g.lineWidth=1; g.stroke();
-    g.strokeStyle='#F2B544'; g.lineWidth=1.5; rr(g,it.x+15,it.y+15,14,12,2); g.stroke();
+    g.strokeStyle=accentHex(); g.lineWidth=1.5; rr(g,it.x+15,it.y+15,14,12,2); g.stroke();
     g.font=`600 15px ${FONT}`; g.fillStyle=UI.text; g.textAlign='left';
     fillLines(g,wrapLines(g,b?b.name:'Board',it.w-52).slice(0,2),it.x+38,it.y+11,20);
     const n=b?b.items.filter(i=>i.type!=='link').length:0;
