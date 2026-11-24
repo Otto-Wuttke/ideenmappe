@@ -1,6 +1,6 @@
 {
   "name": "ideenmappe",
-  "version": "1.0.7-beta",
+  "version": "1.0.8-beta",
   "description": "Ideenmappe – unendliche Zeichen- und Sammelfläche, selbst gehostet",
   "main": "server.js",
   "license": "GPL-3.0-or-later",
