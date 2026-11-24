@@ -7,6 +7,8 @@
  *
  * Stores every board as a JSON file and every image / PDF as a file in DATA_DIR.
  * Run it behind a reverse proxy with HTTPS (see README.md), never as plain HTTP on the internet.
+ *
+ * Copyright (C) 2026 Otto Wuttke – licensed under the GNU GPL v3 or later (see LICENSE).
  */
 'use strict';
 const http = require('http');

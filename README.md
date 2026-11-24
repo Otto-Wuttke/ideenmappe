@@ -42,39 +42,58 @@ data/session.key Schlüssel für die Anmelde-Cookies
 
 **Voraussetzungen:** Linux-VPS (z. B. Ubuntu/Debian), eine (Sub-)Domain mit DNS-Eintrag auf den VPS (z. B. `mappe.deinedomain.de`), Ports 80/443 offen, Docker mit Compose-Plugin. Die App läuft direkt auf der Domain, nicht in einem Unterpfad.
 
-### 1. Lesezugriff für den VPS (Deploy Key, einmalig)
-
-Das Repository ist privat. Der VPS bekommt deshalb einen eigenen Schlüssel, der nur dieses Repository und nur lesen darf.
+### 1. Holen und einrichten
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/ideenmappe_deploy -N "" -C "vps-ideenmappe"
-cat ~/.ssh/ideenmappe_deploy.pub
-```
-
-Die ausgegebene Zeile in GitHub eintragen: **Repository → Settings → Deploy keys → Add deploy key**. Titel z. B. „VPS“, **„Allow write access“ nicht ankreuzen**.
-
-```bash
-cat >> ~/.ssh/config <<'EOF'
-Host github-ideenmappe
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/ideenmappe_deploy
-  IdentitiesOnly yes
-EOF
-```
-
-### 2. Holen und einrichten
-
-```bash
-git clone git@github-ideenmappe:Otto-Wuttke/ideenmappe.git ~/ideenmappe
+sudo apt install -y git
+git clone https://github.com/Otto-Wuttke/ideenmappe.git ~/ideenmappe
 cd ~/ideenmappe
 cp .env.example .env
 nano .env                 # APP_PASSWORD setzen (mindestens 10, besser 20+ Zeichen)
+mkdir -p data && sudo chown 1000:1000 data
+```
+
+Läuft auf dem VPS schon **Nginx Proxy Manager**, weiter mit Abschnitt 2a. Sonst direkt starten und mit 2b weitermachen:
+
+```bash
 docker compose up -d --build
 docker compose logs -f    # sollte "Ideenmappe läuft auf …" zeigen
 ```
 
-### 3. HTTPS mit Caddy
+### 2a. HTTPS mit Nginx Proxy Manager (wenn schon vorhanden)
+
+Die Mappe kommt in das Docker-Netzwerk von NPM; NPM leitet die Subdomain dorthin weiter und holt das Zertifikat.
+
+```bash
+cd ~/ideenmappe
+NPM=$(docker ps --format '{{.Names}} {{.Image}}' | awk '/nginx-proxy-manager/{print $1; exit}')
+NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$NPM" | awk '{print $1}')
+echo "NPM-Container: $NPM  –  Netzwerk: $NET"
+cat > docker-compose.override.yml <<EOF
+services:
+  ideenmappe:
+    networks: [default, npm]
+networks:
+  npm:
+    external: true
+    name: $NET
+EOF
+docker compose up -d --build
+```
+
+In NPM: **Hosts → Proxy Hosts → Add Proxy Host**
+- Details: Domain = deine Subdomain, Scheme `http`, Forward Hostname `ideenmappe`, Port `8080`, „Block Common Exploits“ und „Websockets Support“ an
+- SSL: „Request a new SSL Certificate“, „Force SSL“, „HTTP/2 Support“
+- Advanced (für Live-Abgleich und große PDFs):
+
+```nginx
+proxy_buffering off;
+proxy_cache off;
+proxy_read_timeout 1h;
+client_max_body_size 60m;
+```
+
+### 2b. HTTPS mit Caddy (wenn noch kein Webserver läuft)
 
 ```bash
 sudo apt install -y caddy
@@ -94,7 +113,7 @@ Mit nginx statt Caddy: `proxy_pass http://127.0.0.1:8080;`, dazu `proxy_bufferin
 sudo apt install -y nodejs                      # node -v muss ≥ 18 sein
 sudo useradd --system --home /opt/ideenmappe --shell /usr/sbin/nologin ideenmappe
 sudo mkdir -p /opt/ideenmappe /var/lib/ideenmappe && sudo chown "$USER" /opt/ideenmappe
-git clone git@github-ideenmappe:Otto-Wuttke/ideenmappe.git /opt/ideenmappe
+git clone https://github.com/Otto-Wuttke/ideenmappe.git /opt/ideenmappe
 sudo chown -R ideenmappe:ideenmappe /var/lib/ideenmappe
 sudo cp /opt/ideenmappe/.env.example /etc/ideenmappe.env && sudo chmod 600 /etc/ideenmappe.env
 sudo nano /etc/ideenmappe.env                   # APP_PASSWORD setzen
@@ -133,3 +152,13 @@ Das Skript holt die neueste Version, startet neu (Docker oder systemd) und zeigt
 
 - Die App kontaktiert keine anderen Server. Schrift und Bibliotheken sind enthalten (`public/vendor/`, Lizenzen in `public/vendor/LICENSES.md`), und der Server erlaubt dem Browser nur Inhalte vom eigenen Server.
 - Bearbeiten zwei Geräte gleichzeitig dasselbe Board, gewinnt der zuletzt gespeicherte Stand.
+
+---
+
+## Lizenz
+
+Ideenmappe – Copyright © 2026 Otto Wuttke
+
+Dieses Programm ist freie Software: Du kannst es unter den Bedingungen der **GNU General Public License**, Version 3 oder (nach deiner Wahl) jeder späteren Version, wie von der Free Software Foundation veröffentlicht, weitergeben und/oder verändern. Es wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede Gewährleistung**. Den vollständigen Text findest du in [`LICENSE`](LICENSE).
+
+Mitgelieferte Bausteine anderer (pdf.js, jsPDF, perfect-freehand, IBM Plex) behalten ihre eigenen Lizenzen, siehe [`public/vendor/LICENSES.md`](public/vendor/LICENSES.md).

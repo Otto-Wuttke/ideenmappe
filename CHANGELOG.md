@@ -1,5 +1,10 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- Lizenz: GNU GPL v3 oder später (`LICENSE`). Repository öffentlich nutzbar, Installation ohne Deploy Key.
+- README: Einrichtung hinter einem vorhandenen Nginx Proxy Manager.
+
 ## 1.0.7 Beta – 24. November 2026
 
 - Auswahlrahmen: dünne, kräftig graue Linie (bei jedem Zoom 1 Bildpunkt, auch bei 5000 %) mit Fasspunkten an allen vier Ecken; jede Ecke ändert die Größe (die gegenüberliegende bleibt stehen).
