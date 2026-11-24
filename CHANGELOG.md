@@ -2,6 +2,7 @@
 
 ## 1.0.6 Beta – 23. November 2026
 
+- Textboxen: Schriftgröße wie in einer Textverarbeitung – Zahlenfeld zum Eintippen (mit Liste üblicher Größen, Pfeiltasten), A− / A+ springen zur nächsten Größe; dazu ein eigener Fett-Schalter. Bisherige Boxen behalten ihr Aussehen.
 - Zoom bis 5000 % (bisher 500 %).
 - Das Raster teilt sich beim Hineinzoomen weiter auf, statt riesige Kästchen zu zeigen.
 - Pinselgröße ab 0,05 (bisher 0,5), damit man auch stark vergrößert fein zeichnen kann.
