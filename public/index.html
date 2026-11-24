@@ -746,6 +746,34 @@ let views=lsGet('ideenmappe:views',{});
 let lastCorner=0;
 let sel=new Set(), tool='select', editing=null, spaceDown=false, action=null, lastTap=null, activePdf=null;
 const hist={}, redo={};
+/* ---------- undo history that survives reloading and follows to other devices ----------
+   Stored per board as its own record "<board>__verlauf" (so it never counts against the board's size): the steps
+   are kept as differences between neighbouring states, starting from the saved board. A history is only used if
+   it was written for exactly the board state that is loaded (fingerprint), otherwise it would undo the wrong thing. */
+const HSUF='__verlauf', histDirty=new Set(), histRecs={};
+const isHistId=id=>String(id).endsWith(HSUF);
+function fp(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36)+':'+str.length; }
+const cleanItems=arr=>arr.filter(i=>!i._tmp).map(i=>{const o={};for(const k in i){if(k[0]!=='_')o[k]=i[k];}return o;});
+function hdiff(from,to){ // what turns state "from" into state "to"
+  const F=new Map(from.map(i=>[i.id,JSON.stringify(i)])), c={};
+  for(const i of to){ const j=JSON.stringify(i); if(F.get(i.id)!==j) c[i.id]=i; }
+  return {o:to.map(i=>i.id),c};
+}
+function happly(from,d){ const F=new Map(from.map(i=>[i.id,i])); return d.o.map(id=>d.c[id]||F.get(id)).filter(Boolean); }
+function encodeHist(bid,items,limit){
+  const cur0=cleanItems(items), base=fp(JSON.stringify(cur0));
+  const chain=stack=>{ const out=[]; let prev=cur0; for(let k=(stack||[]).length-1;k>=0;k--){ const st=cleanItems(JSON.parse(stack[k])); out.push(hdiff(prev,st)); prev=st; } return out; };
+  const rec={base,u:chain(hist[bid]),r:chain(redo[bid]),at:Date.now()};
+  while(JSON.stringify(rec).length>limit&&(rec.u.length||rec.r.length)){ if(rec.u.length>=rec.r.length) rec.u.pop(); else rec.r.pop(); }
+  return rec;
+}
+function adoptHist(bid){ // use a stored history if it belongs to the board as it is now
+  const rec=histRecs[bid], b=boards[bid]; if(!rec||!b||!Array.isArray(rec.u)) return false;
+  const cur0=cleanItems(b.items); if(fp(JSON.stringify(cur0))!==rec.base) return false;
+  const build=list=>{ const out=[]; let prev=cur0; for(const d of list||[]){ prev=happly(prev,d); out.unshift(JSON.stringify(prev)); } return out; };
+  hist[bid]=build(rec.u); redo[bid]=build(rec.r); return true;
+}
+const histLimit=()=>store.server?4e6:store.mode==='local'?6e5:240000;
 const els=new Map(), inkEls=new Map(), inkCache=new Map();
 let freehand=null, fhVer=0;
 
@@ -789,6 +817,9 @@ async function flush(){
   if(store.mode==='local'){
     const all={};for(const id in boards) all[id]=serialize(boards[id]);
     dirty.clear();
+    const hs=lsGet('ideenmappe:verlauf',{}); for(const id of histDirty){ if(boards[id]) hs[id]=encodeHist(id,boards[id].items,histLimit()); } histDirty.clear();
+    for(const id in hs) if(!boards[id]) delete hs[id];
+    lsSet('ideenmappe:verlauf',hs); // if this does not fit, only the stored history is missing
     if(lsSet('ideenmappe:boards',all)) setStatus('local','Nur in diesem Browser');
     else {setStatus('error','Browser-Speicher voll');toast('Der Browser-Speicher ist voll. Entferne große Bilder oder lege weniger Inhalte an.');}
     return;
@@ -805,7 +836,12 @@ async function flush(){
       continue;
     }
     saving.add(id);
-    try{ await store.db.collection(store.coll).doc(id).set(body); }
+    try{
+      await store.db.collection(store.coll).doc(id).set(body);
+      if(histDirty.has(id)){ histDirty.delete(id);
+        const rec=encodeHist(id,body.items,histLimit()); histRecs[id]=rec;
+        store.db.collection(store.coll).doc(id+HSUF).set(rec).catch(()=>{}); } // a lost history write only costs the stored steps
+    }
     catch(e){
       const c=e&&e.code;
       if(c==='unavailable'||c==='resource_exhausted'){ dirty.add(id); setTimeout(flush,1500+Math.random()*1500); }
@@ -815,7 +851,8 @@ async function flush(){
     }
     saving.delete(id);
   }
-  if(dirty.size){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,400); }
+  for(const id of [...histDirty]) if(boards[id]&&!dirty.has(id)&&!saving.has(id)) dirty.add(id); // history alone changed? save once more
+  if(dirty.size&&[...dirty].some(id=>!saving.has(id))){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,400); }
   else if(!saving.size && $('#status').dataset.s!=='error') setStatus('ok','Gespeichert');
 }
 window.addEventListener('beforeunload',()=>{ if(store.mode==='local'&&dirty.size) flush(); });
@@ -852,8 +889,9 @@ async function initStorage(){
     if(first){
       first=false; clearTimeout(slow);
       boards={};
-      snap.docs.forEach(d=>{ if(d.exists) boards[d.id]=normBoard(d.id,d.data()); });
+      snap.docs.forEach(d=>{ if(!d.exists) return; if(isHistId(d.id)) histRecs[d.id.slice(0,-HSUF.length)]=d.data(); else boards[d.id]=normBoard(d.id,d.data()); });
       if(!boards.root){ seedDemo(); }
+      for(const id in boards) adoptHist(id);
       store.mode='db'; setStatus('ok','Gespeichert'); ready();
       return;
     }
@@ -861,6 +899,7 @@ async function initStorage(){
     snap.docChanges().forEach(ch=>{
       if(ch.type==='removed') return;
       const d=ch.doc, id=d.id;
+      if(isHistId(id)){ const bid=id.slice(0,-HSUF.length); if(d.metadata.hasPendingWrites||dirty.has(bid)||saving.has(bid)||histDirty.has(bid)) return; histRecs[bid]=d.data(); if(!(bid===cur&&(action||editing))) adoptHist(bid); return; }
       if(d.metadata.hasPendingWrites||dirty.has(id)||saving.has(id)) return;
       // an older state than what this browser last saved (late or repeated delivery) must never overwrite newer work
       const u=(d.data()||{}).updatedAt||0;
@@ -869,7 +908,7 @@ async function initStorage(){
       const nb=normBoard(id,d.data()), old=boards[id];
       // Images and PDFs still uploading exist only here; keep them, or the synced copy would wipe them out.
       if(old) old.items.forEach(i=>{ if(i._tmp&&!nb.items.some(n=>n.id===i.id)) nb.items.push(i); });
-      boards[id]=nb; touched=true;
+      boards[id]=nb; touched=true; adoptHist(id);
     });
     if(touched){ if(!boards[cur]) cur='root'; pruneSel(); render(); renderCrumbs(); }
   },err=>{
@@ -944,6 +983,7 @@ function startLocal(msg){
   boards={};
   if(saved&&saved.root){ for(const id in saved) boards[id]=normBoard(id,saved[id]); }
   else seedDemo();
+  Object.assign(histRecs,lsGet('ideenmappe:verlauf',{})); for(const id in boards) adoptHist(id);
   setStatus('local','Nur in diesem Browser');
   ready();
   if(msg) toast(msg);
@@ -1134,7 +1174,7 @@ function inkHit(it,wx,wy,r){
 
 /* ---------- history ---------- */
 function pushHistory(bid){
-  bid=bid||cur;
+  bid=bid||cur; histDirty.add(bid);
   (hist[bid]=hist[bid]||[]).push(JSON.stringify(boards[bid].items));
   if(hist[bid].length>120) hist[bid].shift();
   redo[bid]=[];
@@ -1142,12 +1182,12 @@ function pushHistory(bid){
 function undo(){
   const h=hist[cur]; if(!h||!h.length) return;
   (redo[cur]=redo[cur]||[]).push(JSON.stringify(items()));
-  board().items=JSON.parse(h.pop()); sel.clear(); markDirty(); render();
+  board().items=JSON.parse(h.pop()); sel.clear(); histDirty.add(cur); markDirty(); render();
 }
 function redoIt(){
   const r=redo[cur]; if(!r||!r.length) return;
   (hist[cur]=hist[cur]||[]).push(JSON.stringify(items()));
-  board().items=JSON.parse(r.pop()); sel.clear(); markDirty(); render();
+  board().items=JSON.parse(r.pop()); sel.clear(); histDirty.add(cur); markDirty(); render();
 }
 
 /* ---------- rendering ---------- */
