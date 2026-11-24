@@ -1503,6 +1503,12 @@ function leadPts(it,L,byId,B){
   if(left?E.x<kx:E.x>kx) P.push([kx,yy]);
   P.push([E.x,E.y]); return P;
 }
+// line points and heads of a leader: end 'dot' | 'arrow' | 'both' (arrows at both ends)
+function leadGeom(P,end){
+  const Q=P.slice(), heads=[], H=leadHead(P,end==='both'?'arrow':end); if(H.line) Q[Q.length-1]=H.line; heads.push(H);
+  if(end==='both'){ const S=leadHead(P.slice().reverse(),'arrow'); Q[0]=S.line; heads.push(S); }
+  return {Q,heads};
+}
 function leadHead(P,end){ // arrow triangle or dot at the end, as points / circle
   const e=P[P.length-1], f=P[P.length-2], len=Math.hypot(e[0]-f[0],e[1]-f[1])||1, ux=(e[0]-f[0])/len, uy=(e[1]-f[1])/len;
   if(end==='arrow'){ const bx=e[0]-ux*9, by=e[1]-uy*9; return {tri:[[e[0],e[1]],[bx-uy*3.6,by+ux*3.6],[bx+uy*3.6,by-ux*3.6]],line:[bx+ux*1,by+uy*1]}; }
@@ -1515,10 +1521,10 @@ function renderLeads(list){
     const b=textBoxRect(it); if(!b) continue;
     const P0=pal(it), col=sel.has(it.id)?'#F2B544':(P0[it.color]||P0.graphite).ink;
     for(const L of it.leads){
-      const P=leadPts(it,L,byId,b), H=leadHead(P,L.end), Q=P.slice(); if(H.line) Q[Q.length-1]=H.line;
+      const P=leadPts(it,L,byId,b), {Q,heads}=leadGeom(P,L.end);
       const d='M'+Q.map(p=>p[0]+' '+p[1]).join(' L'), dh='M'+P.map(p=>p[0]+' '+p[1]).join(' L');
       h+=`<g data-id="${it.id}"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>`
-        +(H.tri?`<path d="M${H.tri.map(p=>p.join(' ')).join(' L')}Z" fill="${col}"/>`:`<circle cx="${H.dot[0]}" cy="${H.dot[1]}" r="${H.dot[2]}" fill="${col}"/>`)
+        +heads.map(H=>H.tri?`<path d="M${H.tri.map(p=>p.join(' ')).join(' L')}Z" fill="${col}"/>`:`<circle cx="${H.dot[0]}" cy="${H.dot[1]}" r="${H.dot[2]}" fill="${col}"/>`).join('')
         +`<path class="hit" d="${dh}"/></g>`;
     }
   }
@@ -1639,8 +1645,8 @@ function renderCtx(){
     h+='<div class="vsep"></div>';
     const LL=s.flatMap(i=>i.leads||[]);
     if(LL.length){
-      const en=LL.every(L=>L.end==='arrow')?'arrow':LL.every(L=>L.end!=='arrow')?'dot':'';
-      h+=`<button class="tb" data-act="lend" data-v="dot" aria-pressed="${en==='dot'}" title="Führungslinie endet mit Punkt">● Punkt</button><button class="tb" data-act="lend" data-v="arrow" aria-pressed="${en==='arrow'}" title="Führungslinie endet mit Pfeil">→ Pfeil</button><button class="tb" data-act="ldel" title="Führungslinien dieser Textbox entfernen">Linien weg</button><div class="vsep"></div>`;
+      const e0=LL[0].end==='arrow'||LL[0].end==='both'?LL[0].end:'dot', en=LL.every(L=>(L.end==='arrow'||L.end==='both'?L.end:'dot')===e0)?e0:'';
+      h+=`<button class="tb" data-act="lend" data-v="dot" aria-pressed="${en==='dot'}" title="Führungslinie endet mit Punkt">● Punkt</button><button class="tb" data-act="lend" data-v="arrow" aria-pressed="${en==='arrow'}" title="Führungslinie endet mit Pfeil">→ Pfeil</button><button class="tb" data-act="lend" data-v="both" aria-pressed="${en==='both'}" title="Pfeil an beiden Enden">↔ Beidseitig</button><button class="tb" data-act="ldel" title="Führungslinien dieser Textbox entfernen">Linien weg</button><div class="vsep"></div>`;
     }
   }
   if(types.size===1&&types.has('shape')){
@@ -3165,10 +3171,10 @@ async function rasterize(R,s,bg,only){
   { const byId=new Map(list.map(i=>[i.id,i]));
     for(const it of list){ if(it.type!=='text'||!it.leads||!take(it)||!inkVisible(it)) continue;
       const P0=pal(it), col=(P0[it.color]||P0.graphite).ink, b=textBoxRect(it); if(!b) continue;
-      for(const L of it.leads){ const P=leadPts(it,L,byId,b), H=leadHead(P,L.end), Q=P.slice(); if(H.line) Q[Q.length-1]=H.line;
+      for(const L of it.leads){ const P=leadPts(it,L,byId,b), {Q,heads}=leadGeom(P,L.end);
         g.strokeStyle=col; g.fillStyle=col; g.lineWidth=1.3; g.lineJoin='round'; g.lineCap='round'; g.globalAlpha=1;
         g.beginPath(); g.moveTo(Q[0][0],Q[0][1]); Q.slice(1).forEach(p=>g.lineTo(p[0],p[1])); g.stroke();
-        g.beginPath(); if(H.tri){ g.moveTo(...H.tri[0]); g.lineTo(...H.tri[1]); g.lineTo(...H.tri[2]); g.closePath(); } else g.arc(H.dot[0],H.dot[1],H.dot[2],0,Math.PI*2); g.fill(); } } }
+        for(const H of heads){ g.beginPath(); if(H.tri){ g.moveTo(...H.tri[0]); g.lineTo(...H.tri[1]); g.lineTo(...H.tri[2]); g.closePath(); } else g.arc(H.dot[0],H.dot[1],H.dot[2],0,Math.PI*2); g.fill(); } } } }
   // sketches on top, like on screen
   for(const it of list){ if(it.type==='ink'&&take(it)&&inR(it)) await drawInkTo(g,it); }
   return c;
