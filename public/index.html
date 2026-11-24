@@ -159,7 +159,7 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .handle.corner[data-c=nw],.handle.corner[data-c=se]{cursor:nwse-resize}
 .handle.corner[data-c=ne],.handle.corner[data-c=sw]{cursor:nesw-resize}
 .handle.rot{border-radius:50%;border-color:var(--sel);background:var(--bg);cursor:grab;display:grid;place-items:center}
-.handle.rot svg:not(.frm){width:72%;height:72%;color:var(--sel);pointer-events:none}
+.handle.rot svg.rico{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 #overlay svg.frm{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .handle{position:absolute;background:var(--bg);border-style:solid;border-color:var(--accent);pointer-events:auto;touch-action:none}
 .handle.resize{cursor:nwse-resize}
@@ -1622,7 +1622,7 @@ function renderOverlay(){
       [['nw',-1,-1],['ne',1,-1],['sw',-1,1],['se',1,1]].forEach(([k,sx,sy])=>{
         const q=rotPt(c.x+sx*(b.w/2+pad),c.y+sy*(b.h/2+pad),c.x,c.y,it.rot||0);
         if(rotMode){ const rs=18/z;
-          h+=`<div class="handle rot" data-handle="rot" data-c="${k}" title="Ziehen zum Drehen – doppelt tippen: Größe ändern" style="left:${q.x-rs/2}px;top:${q.y-rs/2}px;width:${rs}px;height:${rs}px;border-width:${bw}px"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12.5 5.5A5 5 0 1 0 13 9"/><path d="M13 2.5v3h-3"/></svg></div>`;
+          h+=`<div class="handle rot" data-handle="rot" data-c="${k}" title="Ziehen zum Drehen – doppelt tippen: Größe ändern" style="left:${q.x-rs/2}px;top:${q.y-rs/2}px;width:${rs}px;height:${rs}px;border-width:0;background:none"><svg class="rico" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8.5" fill="var(--bg)" stroke="var(--sel)" stroke-width="1"/><g transform="translate(2.5 2.5) scale(.8125)" fill="none" stroke="var(--sel)" stroke-width="1.6" stroke-linecap="round"><path d="M12.5 5.5A5 5 0 1 0 13 9"/><path d="M13 2.5v3h-3"/></g></svg></div>`;
         } else h+=`<div class="handle resize corner" data-handle="resize" data-c="${k}" title="Ziehen: Größe – doppelt tippen: drehen" style="left:${q.x-hs/2}px;top:${q.y-hs/2}px;width:${hs}px;height:${hs}px;border-width:${bw}px;border-radius:${2/z}px"></div>`;
       });
       if(it.type==='text'){
@@ -1646,7 +1646,7 @@ function renderOverlay(){
   overlay.innerHTML=txPos(h);
   // Outlines as SVG strokes: browsers round CSS borders up to a whole pixel *before* the zoom is applied, so far
   // zoomed in a hairline border turned into a thick bar. An SVG stroke stays exactly 1 px on screen.
-  overlay.querySelectorAll('.selbox,.handle.corner,.handle.rot,.handle.lead').forEach(el=>{
+  overlay.querySelectorAll('.selbox,.handle.corner,.handle.lead').forEach(el=>{
     const w=parseFloat(el.style.width)||1, hh=parseFloat(el.style.height)||1, round=!el.classList.contains('selbox')&&!el.classList.contains('corner');
     const r=round?Math.min(w,hh)/2:(el.classList.contains('selbox')?3/z:2/z);
     el.style.borderWidth='0';
