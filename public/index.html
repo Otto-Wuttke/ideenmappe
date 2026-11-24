@@ -17,6 +17,7 @@
 /* Layout: one full-screen canvas; slim top bar (path + status), floating tool dock at the bottom, context bar for the selection. Single dark theme by design. */
 :root{
   --caret:#6FB8FF;
+  --sel:#A3A7AF;
   --bg:#121316;
   --panel:#1B1D22;
   --panel-2:#24272D;
@@ -48,6 +49,7 @@
 /* paper look: warm white sheet, light blue grid, dark ink */
 :root[data-ui="paper"]{
   --caret:#0A5FD0;
+  --sel:#5C6068;
   --bg:#F7F5F0;
   --panel:#FFFFFF;
   --panel-2:#EFECE6;
@@ -152,7 +154,12 @@ button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--acc
 .t-board .thumbs img{width:44px;height:44px;object-fit:cover;border-radius:5px;background:var(--panel-2)}
 .t-board .thumbs span{flex:1;height:44px;border-radius:5px;border:1px dashed var(--rule)}
 
-.selbox{position:absolute;border-style:solid;border-color:var(--accent);pointer-events:none}
+.selbox{position:absolute;border-style:solid;border-color:var(--sel);pointer-events:none;transform-origin:50% 50%}
+.handle.corner{border-color:var(--sel);background:var(--bg)}
+.handle.corner[data-c=nw],.handle.corner[data-c=se]{cursor:nwse-resize}
+.handle.corner[data-c=ne],.handle.corner[data-c=sw]{cursor:nesw-resize}
+.handle.rot{border-radius:50%;border-color:var(--sel);background:var(--bg);cursor:grab;display:grid;place-items:center}
+.handle.rot svg{width:72%;height:72%;color:var(--sel);pointer-events:none}
 .handle{position:absolute;background:var(--bg);border-style:solid;border-color:var(--accent);pointer-events:auto;touch-action:none}
 .handle.resize{cursor:nwse-resize}
 .handle.link{border-radius:50%;cursor:crosshair;background:var(--accent)}
@@ -734,6 +741,7 @@ function scaleLabel(sc){ sc=sc||scaleOf(); return sc.unit==='px'?'Pixel':'1:'+sc
 /* ---------- state ---------- */
 let boards={}, cur='root', view={x:0,y:0,z:1};
 let views=lsGet('ideenmappe:views',{});
+let lastCorner=0;
 let sel=new Set(), tool='select', editing=null, spaceDown=false, action=null, lastTap=null, activePdf=null;
 const hist={}, redo={};
 const els=new Map(), inkEls=new Map(), inkCache=new Map();
@@ -1048,10 +1056,22 @@ function fit(){
 }
 
 /* ---------- geometry ---------- */
-function bbox(it){
+// geo: the object's own (unrotated) box; bbox: what it covers on the board (rotation included)
+function geo(it){
   if(!it||it.type==='link') return null;
   if(it.att&&!inkVisible(it)) return null;
   return {x:it.x,y:it.y,w:it.w||1,h:it.h||40};
+}
+const ROTATABLE=new Set(['text','note','shape','image','pdf','ink']);
+function rotPt(px,py,cx,cy,a){ const c=Math.cos(a), s=Math.sin(a), dx=px-cx, dy=py-cy; return {x:cx+dx*c-dy*s,y:cy+dx*s+dy*c}; }
+const ctrOf=g=>({x:g.x+g.w/2,y:g.y+g.h/2});
+// a board point in the object's own frame (rotation undone)
+function unrot(it,px,py){ const a=it&&it.rot; if(!a) return {x:px,y:py}; const g=geo(it)||{x:it.x,y:it.y,w:it.w,h:it.h}, c=ctrOf(g); return rotPt(px,py,c.x,c.y,-a); }
+function bbox(it){
+  const g=geo(it); if(!g||!it.rot) return g;
+  const c=ctrOf(g), P=[[g.x,g.y],[g.x+g.w,g.y],[g.x,g.y+g.h],[g.x+g.w,g.y+g.h]].map(([x,y])=>rotPt(x,y,c.x,c.y,it.rot));
+  const xs=P.map(p=>p.x), ys=P.map(p=>p.y), x=Math.min(...xs), y=Math.min(...ys);
+  return {x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y};
 }
 /* Sketches, texts and notes pinned to a PDF page or an image: stored relative to their host,
    so they move with it and only show on their page. Sketches also scale with the host. */
@@ -1064,15 +1084,22 @@ function inkVisible(it){
   const h=hostOf(it); if(!h) return true;
   return h.type!=='pdf'||(h.page||1)===it.pg;
 }
-function absFromRel(it,h){ it.x=h.x+it.rx*h.w; it.y=h.y+it.ry*h.h; if(it.type==='ink'){ it.w=it.rw*h.w; it.h=it.rh*h.h; } }
-function relFromAbs(it,h){ h=h||hostOf(it); if(!h) return; it.rx=(it.x-h.x)/h.w; it.ry=(it.y-h.y)/h.h; if(it.type==='ink'){ it.rw=it.w/h.w; it.rh=it.h/h.h; } }
+function absFromRel(it,h){
+  if(it.type==='ink'){ it.w=it.rw*h.w; it.h=it.rh*h.h; }
+  it.x=h.x+it.rx*h.w; it.y=h.y+it.ry*h.h;
+  if(h.rot){ const hc=ctrOf(h), c=rotPt(it.x+(it.w||0)/2,it.y+(it.h||0)/2,hc.x,hc.y,h.rot); it.x=c.x-(it.w||0)/2; it.y=c.y-(it.h||0)/2; }
+}
+function relFromAbs(it,h){ h=h||hostOf(it); if(!h) return;
+  let x=it.x, y=it.y;
+  if(h.rot){ const hc=ctrOf(h), c=rotPt(it.x+(it.w||0)/2,it.y+(it.h||0)/2,hc.x,hc.y,-h.rot); x=c.x-(it.w||0)/2; y=c.y-(it.h||0)/2; }
+  it.rx=(x-h.x)/h.w; it.ry=(y-h.y)/h.h; if(it.type==='ink'){ it.rw=it.w/h.w; it.rh=it.h/h.h; } }
 function detach(it){ delete it.att; delete it.pg; delete it.rx; delete it.ry; delete it.rw; delete it.rh; }
 function attach(it){
   if(!PINNABLE.has(it.type)) return;
   // sketches go by their middle; texts and notes by where they start
   const px=it.type==='ink'?it.x+it.w/2:it.x+Math.min(it.w||0,24), py=it.type==='ink'?it.y+it.h/2:it.y+Math.min(it.h||0,16);
   const list=items(); let host=null;
-  for(let i=list.length-1;i>=0;i--){ const h=list[i]; if(HOSTS.has(h.type)&&h.id!==it.id&&px>=h.x&&px<=h.x+h.w&&py>=h.y&&py<=h.y+h.h){host=h;break;} }
+  for(let i=list.length-1;i>=0;i--){ const h=list[i]; if(!HOSTS.has(h.type)||h.id===it.id) continue; const q=unrot(h,px,py); if(q.x>=h.x&&q.x<=h.x+h.w&&q.y>=h.y&&q.y<=h.y+h.h){host=h;break;} }
   if(!host){ detach(it); return; }
   it.att=host.id; it.pg=host.type==='pdf'?(host.page||1):null; relFromAbs(it,host);
   if(host.type==='pdf') activePdf=host.id;
@@ -1147,7 +1174,7 @@ function shapePath(kind,w,h){
   return `M${r} 0H${w-r}Q${w} 0 ${w} ${r}V${h-r}Q${w} ${h} ${w-r} ${h}H${r}Q0 ${h} 0 ${h-r}V${r}Q0 0 ${r} 0Z`;
 }
 function updateEl(el,it){
-  el.style.left='0'; el.style.top='0'; el.style.transform=at(it.x,it.y); el.style.width=it.w+'px';
+  el.style.left='0'; el.style.top='0'; el.style.transform=at(it.x,it.y)+(it.rot?` rotate(${it.rot}rad)`:''); el.style.width=it.w+'px';
   colorVars(el,it.color,it);
   const isEd=editing&&editing.id===it.id;
   el.classList.toggle('editing',!!isEd);
@@ -1354,10 +1381,11 @@ function strokeParts(it){
   }
   return parts;
 }
+let inkSeq=0;
 function inkParts(it){
   let c=inkCache.get(it.id);
-  if(c&&c.v===fhVer) return c;
-  c={v:fhVer,parts:strokeParts(it),hit:polyD(it.pts)};
+  if(c&&c.v===fhVer&&c.pts===it.pts) return c; // new points (turned, undone) → shape again
+  c={v:fhVer,k:++inkSeq,pts:it.pts,parts:strokeParts(it),hit:polyD(it.pts)};
   inkCache.set(it.id,c); return c;
 }
 // watercolour: filter (ragged edge, grain, mottled pigment, dark outer rim) + mask (dry bristle streaks)
@@ -1413,7 +1441,7 @@ function renderInk(list){
     if(it.type!=='ink'||!inkVisible(it)) continue;
     let g=inkEls.get(it.id);
     if(!g){ g=document.createElementNS(SVGNS,'g'); g.dataset.id=it.id; inkG.appendChild(g); inkEls.set(it.id,g); }
-    const p=inkParts(it), col=inkColor(it.color,it), key=p.v+'|'+col+'|'+it.brush;
+    const p=inkParts(it), col=inkColor(it.color,it), key=p.k+'|'+col+'|'+it.brush;
     if(g.dataset.k!==key){
       g.dataset.k=key;
       g.innerHTML=partsSVG(p.parts,col,it.id)+`<path class="hit" stroke-linecap="round" d="${p.hit}"/>`;
@@ -1434,6 +1462,7 @@ initMarkers();
 function center(b){return {x:b.x+b.w/2,y:b.y+b.h/2};}
 function kindOf(it){return it.type==='shape'?(it.shape||'rect'):'rect';}
 function edgePt(it,b,tx,ty,gap){
+  if(it.rot){ const g=geo(it), c=center(g), t=rotPt(tx,ty,c.x,c.y,-it.rot), it0={...it}; delete it0.rot; const q=edgePt(it0,g,t.x,t.y,gap); return rotPt(q.x,q.y,c.x,c.y,it.rot); }
   const c=center(b),dx=tx-c.x,dy=ty-c.y; if(!dx&&!dy) return c;
   const hw=b.w/2+gap,hh=b.h/2+gap,k=kindOf(it); let s;
   if(k==='ellipse') s=1/Math.sqrt((dx/hw)**2+(dy/hh)**2);
@@ -1493,7 +1522,7 @@ function textBoxRect(it){
   return b;
 }
 function leadEndPt(L,byId){
-  if(L.to){ const t=byId.get(L.to), tb=t&&bbox(t); if(tb){ L.x=tb.x+L.rx*tb.w; L.y=tb.y+L.ry*tb.h; } }
+  if(L.to){ const t=byId.get(L.to), tb=t&&geo(t); if(tb){ L.x=tb.x+L.rx*tb.w; L.y=tb.y+L.ry*tb.h; if(t.rot){ const c=ctrOf(tb), q=rotPt(L.x,L.y,c.x,c.y,t.rot); L.x=q.x; L.y=q.y; } } }
   return {x:L.x,y:L.y};
 }
 function leadPts(it,L,byId,B){
@@ -1544,40 +1573,72 @@ function leadTarget(cx,cy,self){
 function makeLead(self,w,cx,cy,end){
   const b=textBoxRect(self); if(b&&w.x>=b.x&&w.x<=b.x+b.w&&w.y>=b.y&&w.y<=b.y+b.h) return null; // dropped on the label itself
   const o=leadTarget(cx,cy,self), L={x:w.x,y:w.y,end:end||'dot'};
-  const tb=o&&bbox(o); if(tb&&tb.w>0&&tb.h>0){ L.to=o.id; L.rx=(w.x-tb.x)/tb.w; L.ry=(w.y-tb.y)/tb.h; }
+  const tb=o&&geo(o); if(tb&&tb.w>0&&tb.h>0){ const q=unrot(o,w.x,w.y); L.to=o.id; L.rx=(q.x-tb.x)/tb.w; L.ry=(q.y-tb.y)/tb.h; }
   return L;
 }
 // Positions inside the zoomed drawing are set with translate() instead of left/top: Safari rounds left/top to whole
 // drawing pixels, which far zoomed in makes things jump in big steps; a transform is placed exactly.
 const at=(x,y)=>`translate(${x}px,${y}px)`;
 const txPos=h=>h.replace(/left:([-+\d.e]+)px;top:([-+\d.e]+)px/g,'left:0;top:0;transform:translate($1px,$2px)');
+// Turning: sketches get their points turned (so erasing, hit tests and export need nothing special);
+// all other objects keep a rotation angle (it.rot, radians, around their middle).
+function turnInk(it,snap,cx,cy,da){
+  const sx=snap.w/(snap.ow||1), sy=snap.h/(snap.oh||1);
+  const abs=snap.pts.map(p=>{ const q=rotPt(snap.x+p[0]*sx,snap.y+p[1]*sy,cx,cy,da); return [q.x,q.y,p[2]]; });
+  const n=mkInk(abs,it.color,it.size); it.x=n.x; it.y=n.y; it.w=n.w; it.h=n.h; it.ow=n.ow; it.oh=n.oh; it.pts=n.pts;
+}
+function turnItem(it,snap,c,a0,da){
+  if(it.type==='ink'){ turnInk(it,snap,c.x,c.y,da); if(it.att) relFromAbs(it); }
+  else { const r=a0+da; if(Math.abs(r)<1e-9||Math.abs(Math.abs(r)-2*Math.PI)<1e-9) delete it.rot; else it.rot=r; }
+}
+function turnKid(k,c,da){ // things pinned to a turning image or PDF turn with it
+  const i=k.i;
+  if(k.ink) turnInk(i,k.ink,c.x,c.y,da);
+  else { const q=rotPt(k.x+(k.w||0)/2,k.y+(k.h||0)/2,c.x,c.y,da); i.x=q.x-(i.w||0)/2; i.y=q.y-(i.h||0)/2; const r=k.rot+da; if(Math.abs(r)<1e-9) delete i.rot; else i.rot=r; }
+  relFromAbs(i); // the host has its new angle already: store the place in its own frame
+}
+function toggleXform(force){
+  const it=selItems()[0]; if(!it||!ROTATABLE.has(it.type)) return;
+  xform.id=it.id; xform.mode=force||(xform.mode==='rotate'?'scale':'rotate');
+  renderOverlay(); renderCtx();
+}
+const xform={id:null,mode:'scale'}; // single selection: corner handles scale or turn
 function renderOverlay(){
   const z=view.z, list=items();
   let h='';
-  const bw=1.5/z;
+  const bw=1/z;
   for(const id of sel){
-    const it=list.find(i=>i.id===id); const b=bbox(it); if(!b) continue;
-    const pad=4/z;
-    h+=`<div class="selbox" style="left:${b.x-pad}px;top:${b.y-pad}px;width:${b.w+pad*2}px;height:${b.h+pad*2}px;border-width:${bw}px;border-radius:${6/z}px"></div>`;
+    const it=list.find(i=>i.id===id); const b=geo(it); if(!b) continue;
+    const pad=3/z;
+    h+=`<div class="selbox" style="left:0;top:0;width:${b.w+pad*2}px;height:${b.h+pad*2}px;border-width:${bw}px;border-radius:${3/z}px;transform:translate(${b.x-pad}px,${b.y-pad}px)${it.rot?` rotate(${it.rot}rad)`:''}"></div>`;
   }
+  if(sel.size!==1) xform.id=null;
   if(sel.size===1){
-    const it=list.find(i=>sel.has(i.id)); const b=bbox(it);
+    const it=list.find(i=>sel.has(i.id)); const b=geo(it);
+    if(xform.id!==it?.id){ xform.id=it?.id; xform.mode='scale'; }
     if(b){
-      const hs=13/z, pad=4/z;
-      h+=`<div class="handle resize" data-handle="resize" style="left:${b.x+b.w+pad-hs/2}px;top:${b.y+b.h+pad-hs/2}px;width:${hs}px;height:${hs}px;border-width:${bw}px;border-radius:${3/z}px"></div>`;
+      const hs=11/z, pad=3/z, c=ctrOf(b), rotMode=xform.mode==='rotate'&&ROTATABLE.has(it.type);
+      [['nw',-1,-1],['ne',1,-1],['sw',-1,1],['se',1,1]].forEach(([k,sx,sy])=>{
+        const q=rotPt(c.x+sx*(b.w/2+pad),c.y+sy*(b.h/2+pad),c.x,c.y,it.rot||0);
+        if(rotMode){ const rs=18/z;
+          h+=`<div class="handle rot" data-handle="rot" data-c="${k}" title="Ziehen zum Drehen – doppelt tippen: Größe ändern" style="left:${q.x-rs/2}px;top:${q.y-rs/2}px;width:${rs}px;height:${rs}px;border-width:${bw}px"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12.5 5.5A5 5 0 1 0 13 9"/><path d="M13 2.5v3h-3"/></svg></div>`;
+        } else h+=`<div class="handle resize corner" data-handle="resize" data-c="${k}" title="Ziehen: Größe – doppelt tippen: drehen" style="left:${q.x-hs/2}px;top:${q.y-hs/2}px;width:${hs}px;height:${hs}px;border-width:${bw}px;border-radius:${2/z}px"></div>`;
+      });
       if(it.type==='text'){
         const ls=14/z;
-        h+=`<div class="handle lead" data-handle="lead" title="Ziehen für eine Führungslinie" style="left:${b.x-pad-12/z-ls}px;top:${b.y+b.h/2-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
+        const dp=rotPt(b.x-pad-12/z-ls/2,b.y+b.h/2,b.x+b.w/2,b.y+b.h/2,it.rot||0);
+        h+=`<div class="handle lead" data-handle="lead" title="Ziehen für eine Führungslinie" style="left:${dp.x-ls/2}px;top:${dp.y-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
         if(it.leads&&inkVisible(it)){ const byId=new Map(list.map(i=>[i.id,i])), es=12/z;
           it.leads.forEach((L,i)=>{ const E=leadEndPt(L,byId); h+=`<div class="handle leadend" data-handle="leadend" data-i="${i}" title="Ende verschieben – auf die Textbox ziehen zum Entfernen" style="left:${E.x-es/2}px;top:${E.y-es/2}px;width:${es}px;height:${es}px;border-width:${bw}px"></div>`; }); }
       }
       if(it.type!=='ink'){
         const ls=14/z;
-        h+=`<div class="handle link" data-handle="link" title="Ziehen zum Verbinden" style="left:${b.x+b.w+pad+12/z}px;top:${b.y+b.h/2-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
+        const lp=rotPt(b.x+b.w+pad+12/z+ls/2,b.y+b.h/2,b.x+b.w/2,b.y+b.h/2,it.rot||0);
+        h+=`<div class="handle link" data-handle="link" title="Ziehen zum Verbinden" style="left:${lp.x-ls/2}px;top:${lp.y-ls/2}px;width:${ls}px;height:${ls}px;border-width:${bw}px"></div>`;
       }
       if(action&&action.type==='resize'){
         const fs=11/z;
-        h+=`<div class="dims" style="left:${b.x+b.w+pad+10/z}px;top:${b.y+b.h+pad+6/z}px;font-size:${fs}px;padding:${2/z}px ${6/z}px;border-radius:${4/z}px">${fmtVal(b.w)} × ${fmtVal(b.h)} ${scaleOf().unit}</div>`;
+        h+=`<div class="dims" style="left:${bbox(it).x+bbox(it).w+pad+10/z}px;top:${b.y+b.h+pad+6/z}px;font-size:${fs}px;padding:${2/z}px ${6/z}px;border-radius:${4/z}px">${fmtVal(b.w)} × ${fmtVal(b.h)} ${scaleOf().unit}</div>`;
       }
     }
   }
@@ -1670,6 +1731,12 @@ function renderCtx(){
     h+='<button class="tb" data-act="open">Öffnen</button><button class="tb" data-act="rename">Umbenennen</button><div class="vsep"></div>';
   }
   if(s.length===1&&['text','note','shape'].includes(s[0].type)) h+='<button class="tb" data-act="edit">Bearbeiten</button>';
+  if(s.length===1&&ROTATABLE.has(s[0].type)){
+    const on=xform.id===s[0].id&&xform.mode==='rotate';
+    h+=`<button class="tb" data-act="xform" aria-pressed="${on}" title="Ecken zum Drehen umschalten (oder Ecke doppelt tippen)">↻ Drehen</button>`;
+    if(s[0].rot) h+=`<button class="tb" data-act="rot0" title="Drehung zurücksetzen">0°</button>`;
+    h+='<div class="vsep"></div>';
+  }
   if(!types.has('link')||types.size>1) h+='<button class="tb" data-act="dup">Duplizieren</button><button class="tb" data-act="front">Nach vorn</button><button class="tb" data-act="back">Nach hinten</button>';
   h+='<button class="tb danger" data-act="del">Löschen</button>';
   bar.innerHTML=h; bar.classList.add('show');
@@ -1694,6 +1761,8 @@ $('#ctx').addEventListener('click',e=>{
   if(a==='color'){pushHistory();s.forEach(i=>{ if(['text','note','shape','ink','link'].includes(i.type)) i.color=v; });}
   else if(a==='fs'){pushHistory();s.forEach(i=>i.fs=+v);}
   else if(a==='fsup'||a==='fsdn'){pushHistory();s.forEach(i=>{ if(i.type==='text') i.fs=fsStep(i.fs||18,a==='fsup'?1:-1); });}
+  else if(a==='xform'){ toggleXform(); return; }
+  else if(a==='rot0'){ const it=s[0]; pushHistory(); const g=geo(it), c=ctrOf(g), r=it.rot; delete it.rot; items().filter(i=>i.att===it.id).forEach(i=>turnKid({i,x:i.x,y:i.y,w:i.w,h:i.h,rot:i.rot||0,ink:i.type==='ink'?{x:i.x,y:i.y,w:i.w,h:i.h,ow:i.ow,oh:i.oh,pts:i.pts}:null},c,-r)); }
   else if(a==='ta'){pushHistory();s.forEach(i=>{ if(i.type==='text'){ if(v==='left') delete i.ta; else i.ta=v; } });}
   else if(a==='bold'){pushHistory();const on=!s.every(i=>textWeight(i)>=600);s.forEach(i=>{ if(i.type==='text') i.fw=on?600:400; });}
   else if(a==='lend'){pushHistory();s.forEach(i=>(i.leads||[]).forEach(L=>L.end=v));}
@@ -1874,6 +1943,7 @@ async function pdfDetail(it,el){
   const st=el._pdf||(el._pdf={}), box=el.querySelector('.page'); if(!box) return;
   const dpr=window.devicePixelRatio||1, sc=view.z*dpr;
   const drop=()=>{ if(st.det){ st.det.remove(); st.det=null; st.detKey=null; } };
+  if(it.rot) return drop();
   if(it.w*sc<=(st.res||0)*1.3) return drop();
   const r=vp.getBoundingClientRect();
   const x0=Math.max(0,-view.x/view.z-it.x), y0=Math.max(0,-view.y/view.z-it.y);
@@ -2056,8 +2126,16 @@ vp.addEventListener('pointerdown',e=>{
   if(lt&&(lt.dataset.lehre!=='body'||e.pointerType==='touch')){ action=lehreAction(lt.dataset.lehre==='body'?'move':lt.dataset.lehre,base); if(lt.dataset.lehre==='body') action.slop=true; return; }
   if(tool==='pen'||(e.pointerType==='pen'&&prefs.penDraws&&tool==='select')){ startDraw(base,e,w); return; }
   if(tool==='eraser'){ action={...base,type:'erase',hist:false}; eraseAt(w); return; }
-  if(handle==='resize'&&sel.size===1){
-    const s=selItems()[0]; action={...base,type:'resize',it:s,o:{...bbox(s)},hist:false}; return;
+  if((handle==='resize'||handle==='rot')&&sel.size===1){
+    const s=selItems()[0], now=performance.now();
+    if(lastCorner&&now-lastCorner<380&&ROTATABLE.has(s.type)){ lastCorner=0; toggleXform(); return; }
+    lastCorner=now;
+    const g=geo(s), k=t.dataset.c||'se';
+    const snap=s.type==='ink'?{x:s.x,y:s.y,w:s.w,h:s.h,ow:s.ow,oh:s.oh,pts:s.pts}:null;
+    const kids=items().filter(i=>i.att===s.id).map(i=>({i,x:i.x,y:i.y,w:i.w,h:i.h,rot:i.rot||0,ink:i.type==='ink'?{x:i.x,y:i.y,w:i.w,h:i.h,ow:i.ow,oh:i.oh,pts:i.pts}:null}));
+    if(handle==='rot') action={...base,type:'rotate',it:s,c:ctrOf(g),a0:s.rot||0,snap,kids,hist:false};
+    else action={...base,type:'resize',it:s,o:{...g,rot:s.rot||0},c:k,hist:false};
+    return;
   }
   if(handle==='lead'&&sel.size===1){ action={...base,type:'lead',from:[...sel][0]}; return; }
   if(handle==='leadend'&&sel.size===1){ action={...base,type:'leadEnd',from:[...sel][0],i:+t.dataset.i}; return; }
@@ -2108,16 +2186,33 @@ vp.addEventListener('pointermove',e=>{
     }
     case 'resize':{
       if(!action.hist){pushHistory();action.hist=true;}
-      const it=action.it,o=action.o;
-      let nw=Math.max(it.type==='text'?60:24,o.w+(w.x-action.w0.x)), nh=Math.max(it.type==='ink'?4:24,o.h+(w.y-action.w0.y));
-      if(prefs.grid==='grid'&&it.type==='shape'){nw=Math.max(gridPx(),Math.round((it.x+nw)/gridPx())*gridPx()-it.x);nh=Math.max(gridPx(),Math.round((it.y+nh)/gridPx())*gridPx()-it.y);}
-      if(it.type==='pdf'){ // PDF pages always keep their proportions: the drag is projected onto the page diagonal
-        const tw=o.w+(w.x-action.w0.x), th=o.h+(w.y-action.w0.y);
-        const k=Math.max(80/o.w,(tw*o.w+th*o.h)/(o.w*o.w+o.h*o.h)); nw=o.w*k; nh=o.h*k;
+      const it=action.it,o=action.o, a=o.rot, k=action.c, sx=k.includes('e')?1:-1, sy=k.includes('s')?1:-1;
+      const C0={x:o.x+o.w/2,y:o.y+o.h/2};
+      const A=rotPt(C0.x-sx*o.w/2,C0.y-sy*o.h/2,C0.x,C0.y,a);            // opposite corner stays put
+      const K=rotPt(C0.x+sx*o.w/2,C0.y+sy*o.h/2,C0.x,C0.y,a);            // grabbed corner at the start
+      const P={x:K.x+(w.x-action.w0.x),y:K.y+(w.y-action.w0.y)}, d=rotPt(P.x,P.y,A.x,A.y,-a);
+      let nw=Math.max(it.type==='text'?60:24,sx*(d.x-A.x)), nh=Math.max(it.type==='ink'?4:24,sy*(d.y-A.y));
+      if(prefs.grid==='grid'&&it.type==='shape'&&!a&&k==='se'){nw=Math.max(gridPx(),Math.round((it.x+nw)/gridPx())*gridPx()-it.x);nh=Math.max(gridPx(),Math.round((it.y+nh)/gridPx())*gridPx()-it.y);}
+      if(it.type==='pdf'||((it.type==='image'||it.type==='ink')&&!e.shiftKey)){ // keep proportions: project onto the diagonal
+        const kk=Math.max((it.type==='pdf'?80:8)/o.w,(nw*o.w+nh*o.h)/(o.w*o.w+o.h*o.h)); nw=o.w*kk; nh=o.h*kk;
       }
-      else if((it.type==='image'||it.type==='ink')&&!e.shiftKey){ const r=o.h/o.w; nh=nw*r; }
+      if(it.type==='text'||it.type==='note') nh=o.h;
+      const c=rotPt(A.x+sx*nw/2,A.y+sy*nh/2,A.x,A.y,a);
       it.w=nw; if(it.type!=='text'&&it.type!=='note') it.h=nh;
+      it.x=c.x-nw/2; it.y=c.y-nh/2;
       if(it.type==='ink'&&it.att) relFromAbs(it);
+      render(); break;
+    }
+    case 'rotate':{
+      if(!action.hist){pushHistory();action.hist=true;}
+      const A=action, c=A.c;
+      let da=Math.atan2(w.y-c.y,w.x-c.x)-Math.atan2(A.w0.y-c.y,A.w0.x-c.x);
+      let ang=A.a0+da; const st=Math.PI/12, sa=Math.round(ang/st)*st, snapped=e.shiftKey||Math.abs(sa-ang)<0.035; if(snapped) ang=sa;
+      da=ang-A.a0;
+      turnItem(A.it,A.snap,c,A.a0,da);
+      for(const k of A.kids) turnKid(k,c,da);
+      let deg=((ang*180/Math.PI)%360+360)%360; if(deg>359.95) deg=0;
+      showMeasure((snapped?Math.round(deg):Math.round(deg*10)/10).toLocaleString('de-DE')+'°',e.clientX,e.clientY);
       render(); break;
     }
     case 'marquee': case 'create':{
@@ -2172,6 +2267,7 @@ function endPointer(e,cancelled){
       }else tap(a.hit,e,w);
       break;
     case 'resize': if(a.it.type==='ink') attach(a.it); if(a.hist) markDirty(); render(); break;
+    case 'rotate': showMeasure(''); if(a.hist) markDirty(); render(); break;
     case 'erase': if(a.hist) markDirty(); break;
     case 'vpMove': markDirty(); break;
     case 'marquee':
@@ -2228,6 +2324,7 @@ function tap(id,e,w){
   lastTap=null;
   if(!id){ if(tool==='select') createAt('text',w.x,w.y); return; }
   const it=find(id); if(!it) return;
+  if(it.type==='ink'){ if(!sel.has(id)){ sel=new Set([id]); render(); } toggleXform(); return; }
   if(it.type==='board') enterBoard(it.boardId);
   else if(HOSTS.has(it.type)&&w) createAt('text',w.x,w.y); // double-tap on a PDF page or image: comment right there
   else if(it.type==='text'||it.type==='note'||it.type==='shape') startEdit(id);
@@ -3051,6 +3148,12 @@ async function renderPdfPage(it,px){
 }
 /* draws one card / text / shape / image / PDF / board in world coordinates; s = pixels per world unit */
 async function drawDom(g,it,s){
+  if(!it.rot) return drawDom0(g,it,s);
+  const c=ctrOf({x:it.x,y:it.y,w:it.w,h:it.h||40});
+  g.save(); g.translate(c.x,c.y); g.rotate(it.rot); g.translate(-c.x,-c.y);
+  try{ return await drawDom0(g,it,s); } finally{ g.restore(); }
+}
+async function drawDom0(g,it,s){
   const C=pal(it)[it.color]||pal(it).graphite;
   g.save();
   if(it.type==='text'){
