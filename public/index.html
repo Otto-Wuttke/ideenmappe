@@ -1503,10 +1503,11 @@ function leadPts(it,L,byId,B){
   if(left?E.x<kx:E.x>kx) P.push([kx,yy]);
   P.push([E.x,E.y]); return P;
 }
-// line points and heads of a leader: end 'dot' | 'arrow' | 'both' (arrows at both ends)
+// line points and heads of a leader: end 'dot' (at the object) | 'arrow' (at the object) | 'start' (arrow at the text) | 'both'
 function leadGeom(P,end){
-  const Q=P.slice(), heads=[], H=leadHead(P,end==='both'?'arrow':end); if(H.line) Q[Q.length-1]=H.line; heads.push(H);
-  if(end==='both'){ const S=leadHead(P.slice().reverse(),'arrow'); Q[0]=S.line; heads.push(S); }
+  const Q=P.slice(), heads=[];
+  if(end!=='start'){ const H=leadHead(P,end==='both'?'arrow':end); if(H.line) Q[Q.length-1]=H.line; heads.push(H); }
+  if(end==='both'||end==='start'){ const S=leadHead(P.slice().reverse(),'arrow'); Q[0]=S.line; heads.push(S); }
   return {Q,heads};
 }
 function leadHead(P,end){ // arrow triangle or dot at the end, as points / circle
@@ -1645,8 +1646,8 @@ function renderCtx(){
     h+='<div class="vsep"></div>';
     const LL=s.flatMap(i=>i.leads||[]);
     if(LL.length){
-      const e0=LL[0].end==='arrow'||LL[0].end==='both'?LL[0].end:'dot', en=LL.every(L=>(L.end==='arrow'||L.end==='both'?L.end:'dot')===e0)?e0:'';
-      h+=`<button class="tb" data-act="lend" data-v="dot" aria-pressed="${en==='dot'}" title="Führungslinie endet mit Punkt">● Punkt</button><button class="tb" data-act="lend" data-v="arrow" aria-pressed="${en==='arrow'}" title="Führungslinie endet mit Pfeil">→ Pfeil</button><button class="tb" data-act="lend" data-v="both" aria-pressed="${en==='both'}" title="Pfeil an beiden Enden">↔ Beidseitig</button><button class="tb" data-act="ldel" title="Führungslinien dieser Textbox entfernen">Linien weg</button><div class="vsep"></div>`;
+      const ek=L=>['arrow','start','both'].includes(L.end)?L.end:'dot', e0=ek(LL[0]), en=LL.every(L=>ek(L)===e0)?e0:'';
+      h+=`${[['dot','●—','Punkt am Objekt'],['arrow','—▶','Pfeil am Objekt'],['start','◀—','Pfeil am Text'],['both','◀▶','Pfeile an beiden Enden']].map(([v,l,t])=>`<button class="tb fsb" data-act="lend" data-v="${v}" aria-pressed="${en===v}" title="${t}" aria-label="${t}">${l}</button>`).join('')}<button class="tb" data-act="ldel" title="Führungslinien dieser Textbox entfernen">Linien weg</button><div class="vsep"></div>`;
     }
   }
   if(types.size===1&&types.has('shape')){
